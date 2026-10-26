@@ -37,16 +37,18 @@ final class PatternRedactorTest extends TestCase
         yield 'bearer alone' => ['Request failed with Bearer 9f8e7d6c5b4a3210', 'Request failed with Bearer [REDACTED]'];
 
         // Well-known token formats
-        yield 'jwt' => ['jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U rejected', 'jwt [REDACTED_JWT] rejected'];
-        yield 'aws access key' => ['Using AKIAIOSFODNN7EXAMPLE for upload', 'Using [REDACTED_TOKEN] for upload'];
-        yield 'github token' => ['ghp_aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789 expired', '[REDACTED_TOKEN] expired'];
-        yield 'github fine grained token' => ['github_pat_11ABCDEFG0123456789_abcdefghijklmnop', '[REDACTED_TOKEN]'];
-        yield 'slack token' => ['xoxb-1234567890-abcdefghij', '[REDACTED_TOKEN]'];
-        yield 'stripe key' => ['Stripe error for sk_live_51HxYzAbCdEfGhIjKl', 'Stripe error for [REDACTED_TOKEN]'];
-        yield 'anthropic key' => ['x sk-ant-api03-AbCdEfGhIjKlMnOpQrStUv-123 y', 'x [REDACTED_TOKEN] y'];
-        yield 'openai key' => ['key sk-proj-AbCdEfGhIjKlMnOpQrStUvWx was revoked', 'key [REDACTED_TOKEN] was revoked'];
-        yield 'google api key' => ['AIzaSyA-1234567890abcdefghijklmnopqrstu', '[REDACTED_TOKEN]'];
-        yield 'laravel app key' => ['Key base64:2fl+Ktvkfl+Fuz4Qp/A75G2RTiWVA/ZoKZvp6fiiM10= invalid', 'Key [REDACTED_TOKEN] invalid'];
+        // Token fixtures are assembled at runtime with fake() so that secret
+        // scanners never mistake them for real credentials.
+        yield 'jwt' => ['jwt '.self::fake('eyJ', 'hbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.fakeSignature_123').' rejected', 'jwt [REDACTED_JWT] rejected'];
+        yield 'aws access key' => ['Using '.self::fake('AKIA', 'FAKEFAKEFAKEFAKE').' for upload', 'Using [REDACTED_TOKEN] for upload'];
+        yield 'github token' => [self::fake('ghp_', str_repeat('Fake0', 8)).' expired', '[REDACTED_TOKEN] expired'];
+        yield 'github fine grained token' => [self::fake('github_pat_', str_repeat('Fake_', 6)), '[REDACTED_TOKEN]'];
+        yield 'slack token' => [self::fake('xoxb-', '0000000000-fakefakefake'), '[REDACTED_TOKEN]'];
+        yield 'stripe key' => ['Stripe error for '.self::fake('sk_live_', 'FakeFakeFake1234'), 'Stripe error for [REDACTED_TOKEN]'];
+        yield 'anthropic key' => ['x '.self::fake('sk-ant-', 'api03-FakeFakeFakeFakeFake-000').' y', 'x [REDACTED_TOKEN] y'];
+        yield 'openai key' => ['key '.self::fake('sk-proj-', 'FakeFakeFakeFakeFakeFake').' was revoked', 'key [REDACTED_TOKEN] was revoked'];
+        yield 'google api key' => [self::fake('AIza', 'Fake'.str_repeat('x', 31)), '[REDACTED_TOKEN]'];
+        yield 'laravel app key' => ['Key '.self::fake('base64:', str_repeat('Fake', 10).'000=').' invalid', 'Key [REDACTED_TOKEN] invalid'];
         yield 'private key' => ["-----BEGIN RSA PRIVATE KEY-----\nMIIEow\nIBAAK\n-----END RSA PRIVATE KEY-----", '[REDACTED_PRIVATE_KEY]'];
 
         // Credentials in URLs
@@ -60,6 +62,11 @@ final class PatternRedactorTest extends TestCase
         yield 'ipv4 with port' => ['Could not connect to 10.0.0.12:6379', 'Could not connect to [REDACTED_IP]:6379'];
         yield 'ipv6 full' => ['Client 2001:0db8:85a3:0000:0000:8a2e:0370:7334 blocked', 'Client [REDACTED_IP] blocked'];
         yield 'ipv6 compressed' => ['Request from 2001:db8::1 and ::1', 'Request from [REDACTED_IP] and [REDACTED_IP]'];
+    }
+
+    private static function fake(string $prefix, string $body): string
+    {
+        return $prefix.$body;
     }
 
     #[Test]
