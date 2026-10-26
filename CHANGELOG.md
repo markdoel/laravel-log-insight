@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-26
+
 First release.
 
 ### Added
@@ -50,3 +52,6 @@ First release.
 - PHPUnit test suite with Orchestra Testbench. AI requests are always faked, and stray HTTP requests fail the test.
 - Larastan at level `max` and Laravel Pint.
 - GitHub Actions for PHP 8.2–8.5 × Laravel 12/13, MySQL, Postgres, PHPStan and Pint.
+
+[Unreleased]: https://github.com/markdoel/laravel-log-insight/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/markdoel/laravel-log-insight/releases/tag/v1.0.0
