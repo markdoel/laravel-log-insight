@@ -37,6 +37,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Clustering
+    |--------------------------------------------------------------------------
+    |
+    | Only entries at or above this level are clustered and stored.
+    | One of: debug, info, notice, warning, error, critical, alert, emergency.
+    |
+    */
+
+    'clustering' => [
+        'min_level' => env('LOG_INSIGHT_MIN_LEVEL', 'error'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Redaction
     |--------------------------------------------------------------------------
     |

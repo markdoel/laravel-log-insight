@@ -20,7 +20,22 @@ abstract class TestCase extends Orchestra
 
     protected function defineEnvironment($app): void
     {
+        // CI runs the suite against MySQL and Postgres as well (see tests.yml).
+        $connection = getenv('LOG_INSIGHT_TEST_DB');
+
+        if (is_string($connection) && $connection !== '') {
+            $app['config']->set('database.default', $connection);
+
+            return;
+        }
+
         $app['config']->set('database.default', 'testing');
+        $app['config']->set('database.connections.testing.foreign_key_constraints', true);
+    }
+
+    protected function defineDatabaseMigrations(): void
+    {
+        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
     }
 
     /**

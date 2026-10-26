@@ -5,11 +5,18 @@ declare(strict_types=1);
 namespace MarkusDoell\LogInsight\Tests\Feature;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
+use MarkusDoell\LogInsight\Events\ClusterDetected;
+use MarkusDoell\LogInsight\Models\Cluster;
+use MarkusDoell\LogInsight\Models\Occurrence;
 use MarkusDoell\LogInsight\Tests\TestCase;
 use PHPUnit\Framework\Attributes\Test;
 
 final class AnalyzeCommandTest extends TestCase
 {
+    use RefreshDatabase;
+
     private const FIXTURES = __DIR__.'/../Fixtures/logs';
 
     #[Test]
@@ -18,6 +25,66 @@ final class AnalyzeCommandTest extends TestCase
         $this->command('log-insight:analyze', ['--file' => self::FIXTURES.'/single/laravel.log'])
             ->expectsOutputToContain('Parsed 8 entries (4 with exception) from 1 file.')
             ->assertSuccessful();
+    }
+
+    #[Test]
+    public function it_stores_clusters_and_lists_them(): void
+    {
+        Event::fake([ClusterDetected::class]);
+
+        $this->command('log-insight:analyze', ['--file' => self::FIXTURES.'/single/laravel.log'])
+            ->expectsOutputToContain('Found 5 clusters (5 new).')
+            ->expectsOutputToContain('app/Http/Controllers/OrderController.php:42')
+            ->assertSuccessful();
+
+        $this->assertSame(5, Cluster::query()->count());
+        $this->assertSame(6, Occurrence::query()->count());
+
+        $notFound = Cluster::query()->where('exception_class', 'Illuminate\Database\Eloquent\ModelNotFoundException')->sole();
+        $this->assertSame(2, $notFound->occurrence_count);
+        $this->assertSame('No query results for model [App\Models\Order] 50117', $notFound->sample_message);
+
+        Event::assertDispatchedTimes(ClusterDetected::class, 5);
+    }
+
+    #[Test]
+    public function a_second_run_over_the_same_log_finds_no_new_clusters(): void
+    {
+        $this->command('log-insight:analyze', ['--file' => self::FIXTURES.'/single/laravel.log'])->assertSuccessful();
+
+        Event::fake([ClusterDetected::class]);
+
+        $this->command('log-insight:analyze', ['--file' => self::FIXTURES.'/single/laravel.log'])
+            ->expectsOutputToContain('Found 5 clusters (0 new).')
+            ->assertSuccessful();
+
+        $this->assertSame(6, Occurrence::query()->count());
+        Event::assertNotDispatched(ClusterDetected::class);
+    }
+
+    #[Test]
+    public function a_dry_run_stores_nothing(): void
+    {
+        Event::fake([ClusterDetected::class]);
+
+        $this->command('log-insight:analyze', ['--file' => self::FIXTURES.'/single/laravel.log', '--dry-run' => true])
+            ->expectsOutputToContain('Found 5 clusters.')
+            ->assertSuccessful();
+
+        $this->assertSame(0, Cluster::query()->count());
+        Event::assertNotDispatched(ClusterDetected::class);
+    }
+
+    #[Test]
+    public function the_minimum_level_is_configurable(): void
+    {
+        config()->set('log-insight.clustering.min_level', 'critical');
+
+        $this->command('log-insight:analyze', ['--file' => self::FIXTURES.'/single/laravel.log'])
+            ->expectsOutputToContain('Found 1 cluster (1 new).')
+            ->assertSuccessful();
+
+        $this->assertSame('TypeError', Cluster::query()->sole()->exception_class);
     }
 
     #[Test]

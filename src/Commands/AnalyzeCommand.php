@@ -5,12 +5,17 @@ declare(strict_types=1);
 namespace MarkusDoell\LogInsight\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Str;
+use MarkusDoell\LogInsight\Analysis\AnalysisResult;
+use MarkusDoell\LogInsight\Analysis\ClusterSummary;
 use MarkusDoell\LogInsight\Analysis\LogAnalyzer;
 use MarkusDoell\LogInsight\Exceptions\LogInsightException;
 use MarkusDoell\LogInsight\Support\Since;
 
 final class AnalyzeCommand extends Command
 {
+    private const TABLE_LIMIT = 10;
+
     protected $signature = 'log-insight:analyze
         {--file= : Analyze a single log file instead of the configured log directory}
         {--since= : Only consider entries newer than this, e.g. 30m, 24h, 7d or 2026-01-31}
@@ -46,17 +51,47 @@ final class AnalyzeCommand extends Command
         $this->components->info(sprintf(
             'Parsed %d %s (%d with exception) from %d %s.',
             $result->entries,
-            $result->entries === 1 ? 'entry' : 'entries',
+            Str::plural('entry', $result->entries),
             $result->exceptions,
             count($result->files),
-            count($result->files) === 1 ? 'file' : 'files',
+            Str::plural('file', count($result->files)),
         ));
 
-        foreach ($result->levels as $level => $count) {
-            $this->components->twoColumnDetail(strtoupper($level), (string) $count);
-        }
+        $this->renderClusters($result);
 
         return self::SUCCESS;
+    }
+
+    private function renderClusters(AnalysisResult $result): void
+    {
+        if ($result->clusters === []) {
+            $this->components->info('No errors to cluster.');
+
+            return;
+        }
+
+        $this->components->info($result->dryRun
+            ? sprintf('Found %d %s.', count($result->clusters), Str::plural('cluster', count($result->clusters)))
+            : sprintf('Found %d %s (%d new).', count($result->clusters), Str::plural('cluster', count($result->clusters)), $result->newClusters()));
+
+        $this->table(
+            ['Count', 'Error', 'Message', 'Location', 'New'],
+            array_map(static fn (ClusterSummary $cluster): array => [
+                $cluster->occurrences,
+                $cluster->exceptionClass === null ? strtoupper($cluster->level) : class_basename($cluster->exceptionClass),
+                Str::limit($cluster->message, 60),
+                $cluster->appFrame ?? '-',
+                match ($cluster->isNew) {
+                    true => 'yes',
+                    false => 'no',
+                    null => '-',
+                },
+            ], array_slice($result->clusters, 0, self::TABLE_LIMIT)),
+        );
+
+        if (count($result->clusters) > self::TABLE_LIMIT) {
+            $this->line(sprintf('  … and %d more. See log-insight:report for all clusters.', count($result->clusters) - self::TABLE_LIMIT));
+        }
     }
 
     private function stringOption(string $name): ?string

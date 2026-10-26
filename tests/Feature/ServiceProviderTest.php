@@ -26,4 +26,13 @@ final class ServiceProviderTest extends TestCase
         $this->assertCount(1, $paths);
         $this->assertStringEndsWith('config/log-insight.php', (string) array_key_first($paths));
     }
+
+    #[Test]
+    public function it_registers_the_migrations_for_publishing(): void
+    {
+        $paths = ServiceProvider::pathsToPublish(LogInsightServiceProvider::class, 'log-insight-migrations');
+
+        $this->assertCount(1, $paths);
+        $this->assertFileExists(array_key_first($paths).'/create_log_insight_tables.php');
+    }
 }
