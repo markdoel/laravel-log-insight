@@ -13,6 +13,10 @@
         "claude"
     ],
     "homepage": "https://github.com/markdoel/laravel-log-insight",
+    "support": {
+        "issues": "https://github.com/markdoel/laravel-log-insight/issues",
+        "source": "https://github.com/markdoel/laravel-log-insight"
+    },
     "license": "MIT",
     "authors": [
         {
@@ -30,7 +34,6 @@
         "illuminate/support": "^12.0|^13.0"
     },
     "require-dev": {
-        "guzzlehttp/guzzle": "^7.8",
         "larastan/larastan": "^3.0",
         "laravel/pint": "^1.20",
         "orchestra/testbench": "^10.0|^11.0",
