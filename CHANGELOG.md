@@ -9,3 +9,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Package skeleton with service provider, publishable config and CI pipeline.
+- Parser for the Laravel/Monolog line format (single and daily logs), including multi-line messages, stack traces and previous exceptions.
+- `log-insight:analyze` command with `--file`, `--since` and `--dry-run` options.

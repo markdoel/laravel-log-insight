@@ -1,0 +1,2 @@
+providers:
+  - MarkusDoell\LogInsight\LogInsightServiceProvider
