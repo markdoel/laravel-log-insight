@@ -1,0 +1,67 @@
+{
+    "name": "markusdoell/laravel-log-insight",
+    "description": "Parse Laravel logs, cluster recurring errors and get AI-powered root cause analysis and fix suggestions.",
+    "keywords": [
+        "laravel",
+        "logs",
+        "monolog",
+        "error-tracking",
+        "clustering",
+        "ai",
+        "llm",
+        "anthropic",
+        "claude"
+    ],
+    "homepage": "https://github.com/markusdoell/laravel-log-insight",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Markus Doell",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "illuminate/console": "^12.0|^13.0",
+        "illuminate/contracts": "^12.0|^13.0",
+        "illuminate/database": "^12.0|^13.0",
+        "illuminate/http": "^12.0|^13.0",
+        "illuminate/queue": "^12.0|^13.0",
+        "illuminate/support": "^12.0|^13.0"
+    },
+    "require-dev": {
+        "guzzlehttp/guzzle": "^7.8",
+        "larastan/larastan": "^3.0",
+        "laravel/pint": "^1.20",
+        "orchestra/testbench": "^10.0|^11.0",
+        "phpunit/phpunit": "^11.5|^12.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "MarkusDoell\\LogInsight\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "MarkusDoell\\LogInsight\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "analyse": "phpstan analyse --memory-limit=1G",
+        "format": "pint",
+        "lint": "pint --test"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "MarkusDoell\\LogInsight\\LogInsightServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
