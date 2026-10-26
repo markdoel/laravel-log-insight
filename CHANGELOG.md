@@ -16,3 +16,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Publishable migrations and Eloquent models for clusters, occurrences and analyses.
 - `ClusterDetected` event for newly seen errors.
 - Configurable minimum level for clustering (`LOG_INSIGHT_MIN_LEVEL`, default `error`).
+- Redaction layer that removes secrets, tokens, passwords, credentials in URLs, e-mail and IP addresses before data is sent to an AI provider, with optional redaction of string arguments in stack frames and custom patterns via config.

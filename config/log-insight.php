@@ -55,12 +55,18 @@ return [
     |--------------------------------------------------------------------------
     |
     | Every payload is redacted before it leaves your server. Built-in rules
-    | cover secrets, tokens, passwords, e-mail and IP addresses. Add your own
-    | regular expressions here: pattern => replacement.
+    | cover secrets, tokens, passwords, e-mail and IP addresses.
+    |
+    | "trace_arguments" also replaces string arguments in stack frames, e.g.
+    | login('jane', 'hunter2'), since no pattern can tell what they contain.
+    |
+    | Add your own regular expressions under "patterns": pattern => replacement.
     |
     */
 
     'redaction' => [
+        'trace_arguments' => (bool) env('LOG_INSIGHT_REDACT_TRACE_ARGUMENTS', true),
+
         'patterns' => [
             // '/ORDER-\d{6}/' => '[ORDER_ID]',
         ],

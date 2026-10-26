@@ -11,10 +11,12 @@ use MarkusDoell\LogInsight\Analysis\LogAnalyzer;
 use MarkusDoell\LogInsight\Commands\AnalyzeCommand;
 use MarkusDoell\LogInsight\Contracts\Fingerprinter;
 use MarkusDoell\LogInsight\Contracts\LogParser;
+use MarkusDoell\LogInsight\Contracts\Redactor;
 use MarkusDoell\LogInsight\Data\LogLevel;
 use MarkusDoell\LogInsight\Fingerprinting\DefaultFingerprinter;
 use MarkusDoell\LogInsight\Parsing\LogFileLocator;
 use MarkusDoell\LogInsight\Parsing\MonologLogParser;
+use MarkusDoell\LogInsight\Redaction\PatternRedactor;
 use MarkusDoell\LogInsight\Support\AppPaths;
 
 final class LogInsightServiceProvider extends ServiceProvider
@@ -42,6 +44,22 @@ final class LogInsightServiceProvider extends ServiceProvider
             return new AppPaths(
                 basePath: self::configString($config, 'log-insight.context.base_path', $app->basePath()),
                 appPaths: is_array($appPaths) ? array_values(array_filter($appPaths, is_string(...))) : ['app/'],
+            );
+        });
+
+        $this->app->singleton(Redactor::class, static function (Application $app): PatternRedactor {
+            $config = $app->make(Repository::class);
+            $patterns = [];
+
+            foreach ((array) $config->get('log-insight.redaction.patterns', []) as $pattern => $replacement) {
+                if (is_string($pattern) && is_string($replacement)) {
+                    $patterns[$pattern] = $replacement;
+                }
+            }
+
+            return new PatternRedactor(
+                customPatterns: $patterns,
+                redactTraceArguments: (bool) $config->get('log-insight.redaction.trace_arguments', true),
             );
         });
 
