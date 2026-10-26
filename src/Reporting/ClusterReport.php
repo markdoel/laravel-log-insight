@@ -8,14 +8,21 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use MarkusDoell\LogInsight\Ai\Severity;
 use MarkusDoell\LogInsight\Models\Cluster;
+use MarkusDoell\LogInsight\Storage\InstallationCheck;
 
 /**
  * Queries the stored clusters for a report, most frequent first.
  */
-final class ClusterReport
+final readonly class ClusterReport
 {
+    public function __construct(
+        private InstallationCheck $installation,
+    ) {}
+
     public function build(int $limit = 10, ?CarbonImmutable $since = null, ?Severity $minSeverity = null): Report
     {
+        $this->installation->ensureInstalled();
+
         $query = Cluster::query()
             ->when($since !== null, fn (Builder $query) => $query->where('last_seen_at', '>=', $since?->setTimezone(date_default_timezone_get())))
             ->when($minSeverity !== null, fn (Builder $query) => $query->whereHas(

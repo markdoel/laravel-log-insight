@@ -14,6 +14,7 @@ use MarkusDoell\LogInsight\Events\ClusterDetected;
 use MarkusDoell\LogInsight\Parsing\LogFileLocator;
 use MarkusDoell\LogInsight\Parsing\LogReader;
 use MarkusDoell\LogInsight\Storage\ClusterRepository;
+use MarkusDoell\LogInsight\Storage\InstallationCheck;
 
 /**
  * Orchestrates one analysis run: locate files, read entries, cluster
@@ -29,11 +30,16 @@ final readonly class LogAnalyzer
         private ClusterRepository $repository,
         private Dispatcher $events,
         private AnalysisScheduler $scheduler,
+        private InstallationCheck $installation,
         private LogLevel $minLevel = LogLevel::Error,
     ) {}
 
     public function analyze(?string $file = null, ?CarbonImmutable $since = null, bool $dryRun = false): AnalysisResult
     {
+        if (! $dryRun) {
+            $this->installation->ensureInstalled();
+        }
+
         $files = $this->locator->locate($file, $since);
         $aggregator = new ClusterAggregator($this->fingerprinter);
 
