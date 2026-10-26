@@ -13,6 +13,7 @@ use MarkusDoell\LogInsight\Ai\AnalysisScheduler;
 use MarkusDoell\LogInsight\Ai\ClusterContextBuilder;
 use MarkusDoell\LogInsight\Analysis\LogAnalyzer;
 use MarkusDoell\LogInsight\Commands\AnalyzeCommand;
+use MarkusDoell\LogInsight\Commands\ReportCommand;
 use MarkusDoell\LogInsight\Contracts\Fingerprinter;
 use MarkusDoell\LogInsight\Contracts\LlmClient;
 use MarkusDoell\LogInsight\Contracts\LogParser;
@@ -134,6 +135,7 @@ final class LogInsightServiceProvider extends ServiceProvider
 
             $this->commands([
                 AnalyzeCommand::class,
+                ReportCommand::class,
             ]);
         }
     }

@@ -24,3 +24,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Retries with back-off for rate limits, overload and connection errors (honours `retry-after`), and opt-in server-side fallbacks for declined requests.
 - `LlmClient` interface for additional providers.
 - `AnalysisCompleted` event.
+- `log-insight:report` command: top clusters with analysis status, severity and root cause as a table, or the full report including suggested fixes with `--json`; filters `--limit`, `--since` and `--severity`.
