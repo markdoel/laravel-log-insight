@@ -294,6 +294,10 @@ composer lint      # Pint
 
 The test suite never contacts a real AI provider. Every request is faked with `Http::fake()`, and stray requests fail the test. CI runs the suite on PHP 8.2–8.5 with Laravel 12 and 13, against SQLite, MySQL and Postgres.
 
+## How this was built
+
+I built this package with Claude Code as a pair programmer, the same way I work day to day. I defined the scope, architecture and quality bar (interfaces, redaction before any API call, Larastan at max level, a test suite that never hits a real provider), reviewed every phase and steered the design decisions. Claude Code wrote most of the code under that direction.
+
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md).
