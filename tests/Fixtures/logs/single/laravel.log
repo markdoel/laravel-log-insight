@@ -1,0 +1,44 @@
+#14 /var/www/html/artisan(13): Illuminate\\Foundation\\Application->handleCommand(Object(Symfony\\Component\\Console\\Input\\ArgvInput))
+#15 {main}
+"}
+[2026-10-25 08:12:03] production.INFO: Scheduled command "reports:daily" finished {"duration_ms":1532}
+[2026-10-25 08:15:41] production.WARNING: Slow query detected {"sql":"select * from `orders` where `status` = ?","time_ms":1250.4}
+[2026-10-25 09:02:17] production.ERROR: Payment gateway returned an unexpected response {"order_id":48213,"status":502}
+[2026-10-25 09:30:55] production.ERROR: No query results for model [App\Models\Order] 48213 {"userId":17,"exception":"[object] (Illuminate\\Database\\Eloquent\\ModelNotFoundException(code: 0): No query results for model [App\\Models\\Order] 48213 at /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:780)
+[stacktrace]
+#0 /var/www/html/vendor/laravel/framework/src/Illuminate/Support/Traits/ForwardsCalls.php(23): Illuminate\\Database\\Eloquent\\Builder->findOrFail(48213)
+#1 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php(2449): Illuminate\\Database\\Eloquent\\Model->forwardCallTo(Object(Illuminate\\Database\\Eloquent\\Builder), 'findOrFail', Array)
+#2 /var/www/html/app/Http/Controllers/OrderController.php(42): Illuminate\\Database\\Eloquent\\Model::__callStatic('findOrFail', Array)
+#3 /var/www/html/vendor/laravel/framework/src/Illuminate/Routing/ControllerDispatcher.php(46): App\\Http\\Controllers\\OrderController->show(48213)
+#4 [internal function]: Illuminate\\Routing\\ControllerDispatcher->dispatch(Object(Illuminate\\Routing\\Route), Object(App\\Http\\Controllers\\OrderController), 'show')
+#5 /var/www/html/public/index.php(17): Illuminate\\Foundation\\Application->handleRequest(Object(Illuminate\\Http\\Request))
+#6 {main}
+"}
+[2026-10-25 10:44:09] production.ERROR: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry 'jane.doe@example.com' for key 'users_email_unique' (Connection: mysql, SQL: insert into `users` (`name`, `email`, `updated_at`, `created_at`) values (Jane Doe, jane.doe@example.com, 2026-10-25 10:44:09, 2026-10-25 10:44:09)) {"exception":"[object] (Illuminate\\Database\\UniqueConstraintViolationException(code: 23000): SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry 'jane.doe@example.com' for key 'users_email_unique' (Connection: mysql, SQL: insert into `users` (`name`, `email`, `updated_at`, `created_at`) values (Jane Doe, jane.doe@example.com, 2026-10-25 10:44:09, 2026-10-25 10:44:09)) at /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php:822)
+[stacktrace]
+#0 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Connection.php(776): Illuminate\\Database\\Connection->runQueryCallback('insert into `us...', Array, Object(Closure))
+#1 /var/www/html/app/Services/RegistrationService.php(31): Illuminate\\Database\\Connection->insert('insert into `us...', Array)
+#2 /var/www/html/app/Http/Controllers/Auth/RegisterController.php(25): App\\Services\\RegistrationService->register(Array)
+#3 {main}
+
+[previous exception] [object] (PDOException(code: 23000): SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry 'jane.doe@example.com' for key 'users_email_unique' at /var/www/html/vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:47)
+[stacktrace]
+#0 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php(47): PDOStatement->execute()
+#1 {main}
+"}
+[2026-10-25 11:05:30] production.CRITICAL: App\Services\InvoiceRenderer::render(): Argument #1 ($invoice) must be of type App\Models\Invoice, null given, called in /var/www/html/app/Jobs/SendInvoiceJob.php on line 38 {"exception":"[object] (TypeError(code: 0): App\\Services\\InvoiceRenderer::render(): Argument #1 ($invoice) must be of type App\\Models\\Invoice, null given, called in /var/www/html/app/Jobs/SendInvoiceJob.php on line 38 at /var/www/html/app/Services/InvoiceRenderer.php:19)
+[stacktrace]
+#0 /var/www/html/app/Jobs/SendInvoiceJob.php(38): App\\Services\\InvoiceRenderer->render(NULL)
+#1 /var/www/html/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(36): App\\Jobs\\SendInvoiceJob->handle(Object(App\\Services\\InvoiceRenderer))
+#2 {main}
+"}
+[2026-10-25 12:00:00] production.ERROR: Import failed for row 12
+Expected column "sku" to be present
+Got: name, price {"file":"products.csv"}
+[2026-10-25 12:30:12] production.ERROR: No query results for model [App\Models\Order] 50117 {"userId":4,"exception":"[object] (Illuminate\\Database\\Eloquent\\ModelNotFoundException(code: 0): No query results for model [App\\Models\\Order] 50117 at /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:780)
+[stacktrace]
+#0 /var/www/html/vendor/laravel/framework/src/Illuminate/Support/Traits/ForwardsCalls.php(23): Illuminate\\Database\\Eloquent\\Builder->findOrFail(50117)
+#1 /var/www/html/vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php(2449): Illuminate\\Database\\Eloquent\\Model->forwardCallTo(Object(Illuminate\\Database\\Eloquent\\Builder), 'findOrFail', Array)
+#2 /var/www/html/app/Http/Controllers/OrderController.php(42): Illuminate\\Database\\Eloquent\\Model::__callStatic('findOrFail', Array)
+#3 {main}
+"}

@@ -1,0 +1,3 @@
+[2026-10-25 06:00:01] staging.INFO: Cache warm-up started
+[2026-10-25 06:00:02] staging.ERROR: Undefined array key "currency" {"exception":"[object] (ErrorException(code: 0): Undefined array key \"currency\" at /var/www/html/app/Support/PriceFormatter.php:22)"}
+[2026-10-25 09:41:17] staging.WARNING: Rate limit almost reached for client 42

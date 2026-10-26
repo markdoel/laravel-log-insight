@@ -1,0 +1,9 @@
+[2026-10-24 21:58:40] staging.INFO: Cache warm-up started
+[2026-10-24T22:15:03.123456+02:00] staging.ERROR: Could not connect to cache server at 10.0.0.12:6379
+Connection refused {"exception":"[object] (RuntimeException(code: 111): Could not connect to cache server at 10.0.0.12:6379
+Connection refused at /var/www/html/app/Support/CacheWarmer.php:54)
+[stacktrace]
+#0 /var/www/html/app/Console/Commands/WarmCache.php(28): App\\Support\\CacheWarmer->warm()
+#1 /var/www/html/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(36): App\\Console\\Commands\\WarmCache->handle()
+#2 {main}
+"}
