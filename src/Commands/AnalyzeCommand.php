@@ -58,8 +58,24 @@ final class AnalyzeCommand extends Command
         ));
 
         $this->renderClusters($result);
+        $this->renderAiStatus($result);
 
         return self::SUCCESS;
+    }
+
+    private function renderAiStatus(AnalysisResult $result): void
+    {
+        if ($result->dryRun || $result->clusters === []) {
+            return;
+        }
+
+        match ($result->aiStatus) {
+            AnalysisResult::AI_DISABLED => $this->components->info('AI analysis is disabled (log-insight.analysis.enabled).'),
+            AnalysisResult::AI_NOT_CONFIGURED => $this->components->warn('No API key configured, so no AI analysis was queued. Set ANTHROPIC_API_KEY to enable it.'),
+            default => $this->components->info($result->queuedAnalyses === 0
+                ? 'No clusters waiting for AI analysis.'
+                : sprintf('Queued %d %s for AI analysis.', $result->queuedAnalyses, Str::plural('cluster', $result->queuedAnalyses))),
+        };
     }
 
     private function renderClusters(AnalysisResult $result): void

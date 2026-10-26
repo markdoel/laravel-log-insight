@@ -17,3 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ClusterDetected` event for newly seen errors.
 - Configurable minimum level for clustering (`LOG_INSIGHT_MIN_LEVEL`, default `error`).
 - Redaction layer that removes secrets, tokens, passwords, credentials in URLs, e-mail and IP addresses before data is sent to an AI provider, with optional redaction of string arguments in stack frames and custom patterns via config.
+- AI analysis of new clusters through the Anthropic Messages API (Laravel HTTP client, no SDK) with structured JSON output: `root_cause`, `suggested_fix`, `affected_files`, `severity`, `confidence`.
+- `AnalyzeClusterJob` queue job; analyzed clusters are never sent again and permanent failures are recorded on the cluster.
+- Context for the model: representative stack trace and the source code around the affected line, redacted before sending.
+- Validation of the model's answer with one correction request on invalid JSON.
+- Retries with back-off for rate limits, overload and connection errors (honours `retry-after`), and opt-in server-side fallbacks for declined requests.
+- `LlmClient` interface for additional providers.
+- `AnalysisCompleted` event.

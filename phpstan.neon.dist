@@ -6,4 +6,6 @@ parameters:
     paths:
         - src
         - tests
+    excludePaths:
+        - tests/Fixtures
     tmpDir: build/phpstan

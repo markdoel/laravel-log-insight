@@ -7,7 +7,12 @@ namespace MarkusDoell\LogInsight\Tests\Feature;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
+use MarkusDoell\LogInsight\Events\AnalysisCompleted;
 use MarkusDoell\LogInsight\Events\ClusterDetected;
+use MarkusDoell\LogInsight\Jobs\AnalyzeClusterJob;
+use MarkusDoell\LogInsight\Models\Analysis;
 use MarkusDoell\LogInsight\Models\Cluster;
 use MarkusDoell\LogInsight\Models\Occurrence;
 use MarkusDoell\LogInsight\Tests\TestCase;
@@ -85,6 +90,116 @@ final class AnalyzeCommandTest extends TestCase
             ->assertSuccessful();
 
         $this->assertSame('TypeError', Cluster::query()->sole()->exception_class);
+    }
+
+    #[Test]
+    public function new_clusters_are_queued_for_ai_analysis(): void
+    {
+        config()->set('log-insight.llm.anthropic.api_key', 'test-key');
+        config()->set('log-insight.queue.connection', 'redis');
+        config()->set('log-insight.queue.name', 'insights');
+        Queue::fake();
+
+        $this->command('log-insight:analyze', ['--file' => self::FIXTURES.'/single/laravel.log'])
+            ->expectsOutputToContain('Queued 5 clusters for AI analysis.')
+            ->assertSuccessful();
+
+        Queue::assertPushed(AnalyzeClusterJob::class, 5);
+        Queue::assertPushedOn('insights', AnalyzeClusterJob::class);
+        Queue::assertPushed(AnalyzeClusterJob::class, fn (AnalyzeClusterJob $job): bool => $job->connection === 'redis');
+    }
+
+    #[Test]
+    public function analyzed_and_failed_clusters_are_not_queued_again(): void
+    {
+        config()->set('log-insight.llm.anthropic.api_key', 'test-key');
+        Queue::fake();
+        $this->command('log-insight:analyze', ['--file' => self::FIXTURES.'/single/laravel.log'])->assertSuccessful();
+
+        $analyzed = Cluster::query()->orderBy('id')->firstOrFail();
+        $failed = Cluster::query()->orderBy('id')->skip(1)->firstOrFail();
+        $analyzed->analyses()->create([
+            'provider' => 'anthropic', 'model' => 'm', 'root_cause' => 'x', 'suggested_fix' => 'y',
+            'affected_files' => [], 'severity' => 'low', 'confidence' => 0.5,
+        ]);
+        $failed->forceFill(['analysis_failed_at' => now(), 'analysis_error' => 'refused'])->save();
+
+        Queue::fake();
+
+        $this->command('log-insight:analyze', ['--file' => self::FIXTURES.'/single/laravel.log'])
+            ->expectsOutputToContain('Queued 3 clusters for AI analysis.')
+            ->assertSuccessful();
+
+        Queue::assertPushed(AnalyzeClusterJob::class, 3);
+        Queue::assertNotPushed(AnalyzeClusterJob::class, fn (AnalyzeClusterJob $job): bool => in_array($job->clusterId, [$analyzed->id, $failed->id], true));
+    }
+
+    #[Test]
+    public function nothing_is_queued_without_an_api_key(): void
+    {
+        Queue::fake();
+
+        $this->command('log-insight:analyze', ['--file' => self::FIXTURES.'/single/laravel.log'])
+            ->expectsOutputToContain('No API key configured')
+            ->assertSuccessful();
+
+        Queue::assertNothingPushed();
+    }
+
+    #[Test]
+    public function nothing_is_queued_when_ai_analysis_is_disabled(): void
+    {
+        config()->set('log-insight.llm.anthropic.api_key', 'test-key');
+        config()->set('log-insight.analysis.enabled', false);
+        Queue::fake();
+
+        $this->command('log-insight:analyze', ['--file' => self::FIXTURES.'/single/laravel.log'])
+            ->expectsOutputToContain('AI analysis is disabled')
+            ->assertSuccessful();
+
+        $this->assertSame(5, Cluster::query()->count());
+        Queue::assertNothingPushed();
+    }
+
+    #[Test]
+    public function a_dry_run_queues_nothing(): void
+    {
+        config()->set('log-insight.llm.anthropic.api_key', 'test-key');
+        Queue::fake();
+
+        $this->command('log-insight:analyze', ['--file' => self::FIXTURES.'/single/laravel.log', '--dry-run' => true])
+            ->doesntExpectOutputToContain('Queued')
+            ->assertSuccessful();
+
+        Queue::assertNothingPushed();
+    }
+
+    #[Test]
+    public function the_full_pipeline_stores_analyses_with_a_sync_queue(): void
+    {
+        config()->set('log-insight.llm.anthropic.api_key', 'test-key');
+        Event::fake([AnalysisCompleted::class]);
+        Http::fake(['*' => Http::response([
+            'model' => 'claude-opus-5-5',
+            'content' => [['type' => 'text', 'text' => (string) json_encode([
+                'root_cause' => 'Cause', 'suggested_fix' => 'Fix', 'affected_files' => [], 'severity' => 'high', 'confidence' => 0.7,
+            ])]],
+            'stop_reason' => 'end_turn',
+            'usage' => ['input_tokens' => 10, 'output_tokens' => 5],
+        ])]);
+
+        $this->command('log-insight:analyze', ['--file' => self::FIXTURES.'/single/laravel.log'])->assertSuccessful();
+
+        Http::assertSentCount(5);
+        $this->assertSame(5, Analysis::query()->count());
+        Event::assertDispatchedTimes(AnalysisCompleted::class, 5);
+
+        // A second run sends nothing: every cluster has its analysis.
+        $this->command('log-insight:analyze', ['--file' => self::FIXTURES.'/single/laravel.log'])
+            ->expectsOutputToContain('No clusters waiting for AI analysis.')
+            ->assertSuccessful();
+
+        Http::assertSentCount(5);
     }
 
     #[Test]

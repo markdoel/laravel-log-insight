@@ -6,6 +6,7 @@ namespace MarkusDoell\LogInsight\Analysis;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Events\Dispatcher;
+use MarkusDoell\LogInsight\Ai\AnalysisScheduler;
 use MarkusDoell\LogInsight\Clustering\ClusterAggregator;
 use MarkusDoell\LogInsight\Contracts\Fingerprinter;
 use MarkusDoell\LogInsight\Data\LogLevel;
@@ -16,7 +17,8 @@ use MarkusDoell\LogInsight\Storage\ClusterRepository;
 
 /**
  * Orchestrates one analysis run: locate files, read entries, cluster
- * everything at or above the minimum level and store the clusters.
+ * everything at or above the minimum level, store the clusters and queue
+ * the ones without an analysis for the AI provider.
  */
 final readonly class LogAnalyzer
 {
@@ -26,6 +28,7 @@ final readonly class LogAnalyzer
         private Fingerprinter $fingerprinter,
         private ClusterRepository $repository,
         private Dispatcher $events,
+        private AnalysisScheduler $scheduler,
         private LogLevel $minLevel = LogLevel::Error,
     ) {}
 
@@ -52,6 +55,7 @@ final readonly class LogAnalyzer
         }
 
         $clusters = [];
+        $queued = 0;
 
         foreach ($aggregator->clusters() as $detected) {
             if ($dryRun) {
@@ -66,9 +70,26 @@ final readonly class LogAnalyzer
                 $this->events->dispatch(new ClusterDetected($stored->cluster));
             }
 
+            if ($this->scheduler->schedule($stored->cluster)) {
+                $queued++;
+            }
+
             $clusters[] = ClusterSummary::fromDetected($detected, $stored->isNew);
         }
 
-        return new AnalysisResult($files, $entries, $exceptions, $levels, $clusters, $dryRun);
+        return new AnalysisResult(
+            files: $files,
+            entries: $entries,
+            exceptions: $exceptions,
+            levels: $levels,
+            clusters: $clusters,
+            dryRun: $dryRun,
+            queuedAnalyses: $queued,
+            aiStatus: match (true) {
+                ! $this->scheduler->isEnabled() => AnalysisResult::AI_DISABLED,
+                ! $this->scheduler->isConfigured() => AnalysisResult::AI_NOT_CONFIGURED,
+                default => AnalysisResult::AI_READY,
+            },
+        );
     }
 }

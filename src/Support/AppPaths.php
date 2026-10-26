@@ -74,6 +74,22 @@ final readonly class AppPaths
         return rtrim($this->basePath, '/').'/'.ltrim($relative, '/');
     }
 
+    /**
+     * Readable local file for an application-relative path, or null when it
+     * does not exist or resolves outside the base path (e.g. "app/../../etc/passwd").
+     */
+    public function readableLocal(string $relative): ?string
+    {
+        $base = realpath($this->basePath);
+        $file = realpath($this->local($relative));
+
+        if ($base === false || $file === false || ! is_file($file) || ! is_readable($file)) {
+            return null;
+        }
+
+        return str_starts_with($file, rtrim($base, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR) ? $file : null;
+    }
+
     private function isApplicationPath(string $relative): bool
     {
         foreach ($this->appPaths as $appPath) {

@@ -34,6 +34,8 @@ return new class extends Migration
             $table->unsignedInteger('occurrence_count')->default(0);
             $table->timestamp('first_seen_at');
             $table->timestamp('last_seen_at')->index();
+            $table->timestamp('analysis_failed_at')->nullable();
+            $table->text('analysis_error')->nullable();
             $table->timestamps();
         });
 

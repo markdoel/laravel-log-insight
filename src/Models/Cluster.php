@@ -28,6 +28,8 @@ use MarkusDoell\LogInsight\Models\Concerns\UsesLogInsightConnection;
  * @property int $occurrence_count
  * @property CarbonImmutable $first_seen_at
  * @property CarbonImmutable $last_seen_at
+ * @property CarbonImmutable|null $analysis_failed_at set when the AI analysis failed permanently
+ * @property string|null $analysis_error
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
@@ -79,6 +81,7 @@ class Cluster extends Model
             'occurrence_count' => 'integer',
             'first_seen_at' => 'immutable_datetime',
             'last_seen_at' => 'immutable_datetime',
+            'analysis_failed_at' => 'immutable_datetime',
             'created_at' => 'immutable_datetime',
             'updated_at' => 'immutable_datetime',
         ];

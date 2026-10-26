@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace MarkusDoell\LogInsight\Tests;
 
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
 use Illuminate\Testing\PendingCommand;
 use MarkusDoell\LogInsight\LogInsightServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
@@ -18,8 +20,21 @@ abstract class TestCase extends Orchestra
         return [LogInsightServiceProvider::class];
     }
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Tests must never talk to a real AI provider.
+        Http::preventStrayRequests();
+
+        // Retry back-off must not slow the suite down.
+        Sleep::fake();
+    }
+
     protected function defineEnvironment($app): void
     {
+        $app['config']->set('cache.default', 'array');
+
         // CI runs the suite against MySQL and Postgres as well (see tests.yml).
         $connection = getenv('LOG_INSIGHT_TEST_DB');
 

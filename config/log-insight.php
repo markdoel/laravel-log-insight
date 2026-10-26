@@ -84,13 +84,36 @@ return [
 
     'context' => [
         'lines' => (int) env('LOG_INSIGHT_CONTEXT_LINES', 15),
+        'max_trace_lines' => (int) env('LOG_INSIGHT_MAX_TRACE_LINES', 60),
         'base_path' => env('LOG_INSIGHT_BASE_PATH', base_path()),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | AI Analysis
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, log-insight:analyze queues an AnalyzeClusterJob for every
+    | cluster without an analysis. Analyzed clusters are never sent again.
+    | Disable it to only parse and cluster.
+    |
+    */
+
+    'analysis' => [
+        'enabled' => (bool) env('LOG_INSIGHT_ANALYSIS_ENABLED', true),
     ],
 
     /*
     |--------------------------------------------------------------------------
     | LLM Provider
     |--------------------------------------------------------------------------
+    |
+    | Thinking tokens count towards max_tokens, so keep it generous.
+    | "effort" (low, medium, high, xhigh, max) trades depth for cost.
+    | "fallbacks" lets the API retry a request the model declines on
+    | Anthropic's recommended fallback model; turn it off for models without
+    | server-side fallback support.
+    |
     */
 
     'llm' => [
@@ -98,11 +121,13 @@ return [
 
         'anthropic' => [
             'api_key' => env('ANTHROPIC_API_KEY'),
-            'model' => env('LOG_INSIGHT_MODEL', 'claude-sonnet-5-5'),
+            'model' => env('LOG_INSIGHT_MODEL', 'claude-opus-5-5'),
             'base_url' => env('LOG_INSIGHT_ANTHROPIC_BASE_URL', 'https://api.anthropic.com'),
-            'api_version' => env('LOG_INSIGHT_ANTHROPIC_VERSION', '2023-06-01'),
-            'timeout' => (int) env('LOG_INSIGHT_TIMEOUT', 60),
-            'max_tokens' => (int) env('LOG_INSIGHT_MAX_TOKENS', 2048),
+            'api_version' => env('LOG_INSIGHT_ANTHROPIC_VERSION', '2026-10-21'),
+            'timeout' => (int) env('LOG_INSIGHT_TIMEOUT', 300),
+            'max_tokens' => (int) env('LOG_INSIGHT_MAX_TOKENS', 16000),
+            'effort' => env('LOG_INSIGHT_EFFORT', 'high'),
+            'fallbacks' => (bool) env('LOG_INSIGHT_FALLBACKS', true),
         ],
     ],
 

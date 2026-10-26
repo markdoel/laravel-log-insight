@@ -7,6 +7,7 @@ namespace MarkusDoell\LogInsight\Models;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use MarkusDoell\LogInsight\Ai\Severity;
 use MarkusDoell\LogInsight\Models\Concerns\UsesLogInsightConnection;
 
 /**
@@ -19,7 +20,7 @@ use MarkusDoell\LogInsight\Models\Concerns\UsesLogInsightConnection;
  * @property string $root_cause
  * @property string $suggested_fix
  * @property list<string> $affected_files
- * @property string $severity
+ * @property Severity $severity
  * @property float $confidence
  * @property array<array-key, mixed>|null $raw_response
  * @property int|null $input_tokens
@@ -50,6 +51,7 @@ class Analysis extends Model
     {
         return [
             'affected_files' => 'array',
+            'severity' => Severity::class,
             'confidence' => 'float',
             'raw_response' => 'array',
             'input_tokens' => 'integer',
