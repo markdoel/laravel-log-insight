@@ -1,5 +1,5 @@
 {
-    "name": "markusdoell/laravel-log-insight",
+    "name": "markdoel/laravel-log-insight",
     "description": "Parse Laravel logs, cluster recurring errors and get AI-powered root cause analysis and fix suggestions.",
     "keywords": [
         "laravel",
