@@ -29,10 +29,18 @@ return [
     | code. The topmost stack frame inside one of them becomes part of the
     | error fingerprint. Vendor frames are ignored.
     |
+    | "frame" decides how that frame is identified:
+    | - "line":   "app/Http/Controllers/OrderController.php:42"
+    | - "method": "app/Http/Controllers/OrderController.php::App\Http\Controllers\OrderController::show",
+    |             so deploys that only shift lines keep the same clusters.
+    |             Falls back to the line form when the method is unknown.
+    | Switching modes starts new clusters for errors seen afterwards.
+    |
     */
 
     'fingerprint' => [
         'app_paths' => ['app/', 'src/', 'routes/', 'database/'],
+        'frame' => env('LOG_INSIGHT_FINGERPRINT_FRAME', 'line'),
     ],
 
     /*

@@ -21,6 +21,7 @@ use MarkusDoell\LogInsight\Contracts\Redactor;
 use MarkusDoell\LogInsight\Data\LogLevel;
 use MarkusDoell\LogInsight\Exceptions\LogInsightException;
 use MarkusDoell\LogInsight\Fingerprinting\DefaultFingerprinter;
+use MarkusDoell\LogInsight\Fingerprinting\FrameMode;
 use MarkusDoell\LogInsight\Llm\AnthropicClient;
 use MarkusDoell\LogInsight\Parsing\LogFileLocator;
 use MarkusDoell\LogInsight\Parsing\MonologLogParser;
@@ -35,6 +36,15 @@ final class LogInsightServiceProvider extends ServiceProvider
 
         $this->app->singleton(LogParser::class, MonologLogParser::class);
         $this->app->singleton(Fingerprinter::class, DefaultFingerprinter::class);
+
+        $this->app->when(DefaultFingerprinter::class)
+            ->needs(FrameMode::class)
+            ->give(static function (Application $app): FrameMode {
+                $mode = self::configString($app->make(Repository::class), 'log-insight.fingerprint.frame', 'line');
+
+                return FrameMode::tryFrom(strtolower($mode))
+                    ?? throw new LogInsightException("Unsupported fingerprint frame mode [{$mode}]. Use \"line\" or \"method\".");
+            });
 
         $this->app->singleton(LogFileLocator::class, static function (Application $app): LogFileLocator {
             $config = $app->make(Repository::class);
