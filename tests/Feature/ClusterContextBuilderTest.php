@@ -79,6 +79,41 @@ final class ClusterContextBuilderTest extends TestCase
     }
 
     #[Test]
+    public function it_finds_the_line_of_a_method_frame_in_the_stack_trace(): void
+    {
+        $context = $this->builder()->build($this->makeCluster([
+            'app_frame' => 'app/Http/Controllers/OrderController.php::App\Http\Controllers\OrderController::show',
+            'stack_trace' => implode("\n", [
+                '#0 /var/www/html/vendor/laravel/framework/src/Illuminate/Support/Traits/ForwardsCalls.php(23): Illuminate\Database\Eloquent\Builder->findOrFail(48213)',
+                "#1 /var/www/html/app/Http/Controllers/OrderController.php(24): Illuminate\Database\Eloquent\Model::__callStatic('findOrFail', Array)",
+                '#2 /var/www/html/vendor/laravel/framework/src/Illuminate/Routing/ControllerDispatcher.php(46): App\Http\Controllers\OrderController->show(48213)',
+                '#3 {main}',
+            ]),
+        ]));
+
+        $this->assertStringContainsString('application_frame: app/Http/Controllers/OrderController.php::App\Http\Controllers\OrderController::show', $context);
+        $this->assertStringContainsString("<source file=\"app/Http/Controllers/OrderController.php\" line=\"24\">\n", $context);
+        $this->assertStringContainsString('> 24 |         $order = Order::findOrFail($id);', $context);
+    }
+
+    #[Test]
+    public function it_skips_the_source_of_a_method_frame_without_a_matching_trace_line(): void
+    {
+        foreach ([
+            "#0 /var/www/html/app/Http/Controllers/InvoiceController.php(24): App\Foo->bar()\n#1 /var/www/html/app/Http/Controllers/OrderController.php(24): App\Foo->bar()\n#2 {main}",
+            '#0 {main}',
+            null,
+        ] as $trace) {
+            $context = $this->builder()->build($this->makeCluster([
+                'app_frame' => 'app/Http/Controllers/OrderController.php::App\Http\Controllers\OrderController::show',
+                'stack_trace' => $trace,
+            ]));
+
+            $this->assertStringNotContainsString('<source', $context);
+        }
+    }
+
+    #[Test]
     public function it_redacts_everything_it_sends(): void
     {
         $context = $this->builder()->build($this->makeCluster([
