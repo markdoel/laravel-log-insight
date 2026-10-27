@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Configurable fingerprint frame (`LOG_INSIGHT_FINGERPRINT_FRAME`, config `fingerprint.frame`). `method` identifies the topmost application frame as `path.php::Class::method`, so deploys that only shift lines keep their clusters. The default `line` keeps the existing fingerprints unchanged. Switching modes starts new clusters.
+- The AI source excerpt for method frames uses the line from the cluster's most recent stack trace.
+
 ## [1.0.0] - 2026-10-26
 
 First release.

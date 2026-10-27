@@ -12,6 +12,7 @@ Instead of scrolling through thousands of log lines, you get a short list: *this
 
 - **Log parsing:** reads Laravel's default Monolog format, from both `single` and `daily` log files. Multi-line messages, stack traces and previous exceptions are merged into one entry. Files are streamed, so large logs are fine.
 - **Clustering:** each error gets a fingerprint made of the exception class, the normalized message and the topmost application frame. IDs, UUIDs, e-mail and IP addresses, timestamps, URLs and variable path segments are normalized away, so the same bug lands in the same cluster. Each cluster tracks its count and its first and last occurrence.
+- **Deploy-stable fingerprints (opt-in):** identify the application frame by its method instead of its line, so a deploy that only shifts lines keeps the existing clusters and causes no new AI requests. See [Fingerprint frame](#fingerprint-frame).
 - **Idempotent runs:** analyzing the same log twice never counts an entry twice.
 - **Privacy first:** a redaction layer removes secrets, tokens, passwords, credentials, e-mail and IP addresses before anything leaves your server. You can add your own patterns.
 - **AI analysis:** one queued job per new cluster calls the Anthropic Messages API through Laravel's HTTP client, with no SDK. The context is the representative stack trace plus the source code around the affected line. The answer is structured JSON: `root_cause`, `suggested_fix`, `affected_files`, `severity`, `confidence`.
@@ -175,6 +176,7 @@ All options live in `config/log-insight.php` and can be set via `.env`:
 | `LOG_INSIGHT_FALLBACKS` | `true` | Let the API retry a declined request on Anthropic's recommended fallback model. Disable for models without server-side fallback support. |
 | `LOG_INSIGHT_ANALYSIS_ENABLED` | `true` | Set to `false` to only parse and cluster. |
 | `LOG_INSIGHT_MIN_LEVEL` | `error` | Only entries at or above this level are clustered. |
+| `LOG_INSIGHT_FINGERPRINT_FRAME` | `line` | How the application frame enters the fingerprint: `line` (`path.php:42`) or `method` (`path.php::Class::method`). See [Fingerprint frame](#fingerprint-frame). |
 | `LOG_INSIGHT_CONTEXT_LINES` | `15` | Source lines sent before and after the affected line. |
 | `LOG_INSIGHT_MAX_TRACE_LINES` | `60` | Stack trace lines sent per cluster. |
 | `LOG_INSIGHT_REDACT_TRACE_ARGUMENTS` | `true` | Replace string arguments in stack frames. |
@@ -185,6 +187,27 @@ All options live in `config/log-insight.php` and can be set via `.env`:
 | `LOG_INSIGHT_DB_CONNECTION` | default | Database connection for the `log_insight_*` tables. |
 
 The application directories that count for the "topmost application frame" are set in `fingerprint.app_paths` (default `app/`, `src/`, `routes/`, `database/`). Vendor code never counts.
+
+### Fingerprint frame
+
+By default the topmost application frame is identified by file and line, e.g. `app/Http/Controllers/OrderController.php:42`. That is precise, but a deploy that only adds or removes lines above the failing call moves the line number, so the same bug starts a new cluster and is sent to the AI provider again.
+
+With `LOG_INSIGHT_FINGERPRINT_FRAME=method` the frame is identified by the method that contains it instead:
+
+```text
+app/Http/Controllers/OrderController.php::App\Http\Controllers\OrderController::show
+```
+
+The method is read from the stack trace: the function that contains frame `#k`'s line is the call shown in frame `#k+1`, and for the throw location it is the call of frame `#0`. Closure names from PHP 8.4+ and anonymous classes are reduced to `{closure}` and `class@anonymous`, because their names contain line numbers too. When the method cannot be determined (for example the frame is the last one before `{main}`), the line form is used as a fallback.
+
+Trade-offs:
+
+- **Coarser clusters.** Two different errors of the same exception class and message that are thrown from different lines of the same method end up in one cluster. With `line` they stay separate.
+- **Fewer duplicate clusters and AI requests.** Line shifts from unrelated changes no longer split a cluster. Renaming or moving the method still does.
+- **Location column.** Reports show the method form as the location. The source excerpt for the AI analysis is still taken around the affected line, which is looked up in the cluster's most recent stack trace.
+- **Switching modes starts new clusters.** The frame is part of the fingerprint hash, so errors seen after a switch, in either direction, get new clusters and a new analysis. Existing clusters and analyses stay in the database but no longer receive occurrences, except for errors where `method` falls back to the line form. Switch once, ideally right after a release, and expect a one-off round of AI requests.
+
+`line` stays the default, and its fingerprints are identical to those of earlier versions.
 
 ### Custom redaction patterns
 

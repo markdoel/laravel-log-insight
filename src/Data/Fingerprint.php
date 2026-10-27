@@ -12,7 +12,8 @@ final readonly class Fingerprint
 
     /**
      * @param  string  $hash  stable identifier of the cluster (sha1)
-     * @param  string|null  $appFrame  topmost application frame, e.g. "app/Http/Controllers/OrderController.php:42"
+     * @param  string|null  $appFrame  topmost application frame, e.g. "app/Http/Controllers/OrderController.php:42",
+     *                                 or "app/Http/Controllers/OrderController.php::App\Http\Controllers\OrderController::show" in method mode
      */
     public function __construct(
         public string $hash,
