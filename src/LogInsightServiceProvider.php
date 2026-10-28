@@ -6,11 +6,14 @@ namespace MarkusDoell\LogInsight;
 
 use Illuminate\Contracts\Bus\Dispatcher as BusDispatcher;
 use Illuminate\Contracts\Config\Repository;
+use Illuminate\Contracts\Events\Dispatcher as EventDispatcher;
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Contracts\Notifications\Dispatcher as NotificationDispatcher;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\ServiceProvider;
 use MarkusDoell\LogInsight\Ai\AnalysisScheduler;
 use MarkusDoell\LogInsight\Ai\ClusterContextBuilder;
+use MarkusDoell\LogInsight\Ai\Severity;
 use MarkusDoell\LogInsight\Analysis\LogAnalyzer;
 use MarkusDoell\LogInsight\Commands\AnalyzeCommand;
 use MarkusDoell\LogInsight\Commands\ReportCommand;
@@ -19,14 +22,19 @@ use MarkusDoell\LogInsight\Contracts\LlmClient;
 use MarkusDoell\LogInsight\Contracts\LogParser;
 use MarkusDoell\LogInsight\Contracts\Redactor;
 use MarkusDoell\LogInsight\Data\LogLevel;
+use MarkusDoell\LogInsight\Events\AnalysisCompleted;
 use MarkusDoell\LogInsight\Exceptions\LogInsightException;
 use MarkusDoell\LogInsight\Fingerprinting\DefaultFingerprinter;
 use MarkusDoell\LogInsight\Fingerprinting\FrameMode;
+use MarkusDoell\LogInsight\Listeners\SendSevereClusterNotification;
 use MarkusDoell\LogInsight\Llm\AnthropicClient;
+use MarkusDoell\LogInsight\Notifications\ClusterNotifier;
+use MarkusDoell\LogInsight\Notifications\SlackChannelSupport;
 use MarkusDoell\LogInsight\Parsing\LogFileLocator;
 use MarkusDoell\LogInsight\Parsing\MonologLogParser;
 use MarkusDoell\LogInsight\Redaction\PatternRedactor;
 use MarkusDoell\LogInsight\Support\AppPaths;
+use Psr\Log\LoggerInterface;
 
 final class LogInsightServiceProvider extends ServiceProvider
 {
@@ -130,10 +138,36 @@ final class LogInsightServiceProvider extends ServiceProvider
                 requestTimeout: self::configInt($config, 'log-insight.llm.anthropic.timeout', 300),
             );
         });
+
+        $this->app->singleton(SlackChannelSupport::class, static fn (): SlackChannelSupport => SlackChannelSupport::detect());
+
+        $this->app->singleton(ClusterNotifier::class, static function (Application $app): ClusterNotifier {
+            $config = $app->make(Repository::class);
+            $severity = self::configString($config, 'log-insight.notifications.min_severity', 'critical');
+            $recipients = $config->get('log-insight.notifications.mail.to');
+
+            return new ClusterNotifier(
+                notifications: $app->make(NotificationDispatcher::class),
+                redactor: $app->make(Redactor::class),
+                logger: $app->make(LoggerInterface::class),
+                slack: $app->make(SlackChannelSupport::class),
+                minSeverity: Severity::tryFrom(strtolower($severity))
+                    ?? throw new LogInsightException("Unsupported notification severity [{$severity}]. Use one of: ".implode(', ', Severity::values()).'.'),
+                mailRecipients: is_array($recipients) ? array_values(array_filter($recipients, static fn (mixed $to): bool => is_string($to) && $to !== '')) : [],
+                slackRoute: self::configNullableString($config, 'log-insight.notifications.slack.webhook_url')
+                    ?? self::configNullableString($config, 'log-insight.notifications.slack.channel'),
+                connection: self::configNullableString($config, 'log-insight.queue.connection'),
+                queue: self::configNullableString($config, 'log-insight.queue.name'),
+            );
+        });
     }
 
     public function boot(): void
     {
+        if ((bool) $this->app->make(Repository::class)->get('log-insight.notifications.enabled', false)) {
+            $this->app->make(EventDispatcher::class)->listen(AnalysisCompleted::class, SendSevereClusterNotification::class);
+        }
+
         if ($this->app->runningInConsole()) {
             $this->publishes([
                 __DIR__.'/../config/log-insight.php' => config_path('log-insight.php'),
