@@ -155,6 +155,37 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Notifications
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, every analysis at or above "min_severity" (low, medium,
+    | high, critical) sends one queued notification to the mail recipients
+    | and the Slack route below. It uses the queue settings above.
+    |
+    | Mail uses your application's default mailer. Slack needs the optional
+    | laravel/slack-notification-channel package. "webhook_url" posts to an
+    | incoming webhook; otherwise "channel" (e.g. "#errors") is used with the
+    | bot token from services.slack.notifications.bot_user_oauth_token.
+    |
+    */
+
+    'notifications' => [
+        'enabled' => (bool) env('LOG_INSIGHT_NOTIFICATIONS_ENABLED', false),
+        'min_severity' => env('LOG_INSIGHT_NOTIFICATIONS_MIN_SEVERITY', 'critical'),
+
+        'mail' => [
+            // Comma separated in .env: "ops@example.com,dev@example.com"
+            'to' => array_values(array_filter(array_map('trim', explode(',', (string) env('LOG_INSIGHT_NOTIFICATIONS_MAIL_TO', ''))))),
+        ],
+
+        'slack' => [
+            'webhook_url' => env('LOG_INSIGHT_SLACK_WEBHOOK_URL'),
+            'channel' => env('LOG_INSIGHT_SLACK_CHANNEL'),
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Database
     |--------------------------------------------------------------------------
     |
