@@ -30,14 +30,19 @@
         "illuminate/contracts": "^12.0|^13.0",
         "illuminate/database": "^12.0|^13.0",
         "illuminate/http": "^12.0|^13.0",
+        "illuminate/notifications": "^12.0|^13.0",
         "illuminate/queue": "^12.0|^13.0",
         "illuminate/support": "^12.0|^13.0"
     },
     "require-dev": {
         "larastan/larastan": "^3.0",
         "laravel/pint": "^1.20",
+        "laravel/slack-notification-channel": "^3.6",
         "orchestra/testbench": "^10.0|^11.0",
         "phpunit/phpunit": "^11.5|^12.5"
+    },
+    "suggest": {
+        "laravel/slack-notification-channel": "Required to send log-insight notifications to Slack (^3.6)."
     },
     "autoload": {
         "psr-4": {

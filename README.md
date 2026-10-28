@@ -20,7 +20,8 @@ Instead of scrolling through thousands of log lines, you get a short list: *this
   - A cluster that already has an analysis is never sent again.
   - Invalid answers get exactly one correction request.
   - Permanent failures are recorded and not retried.
-- **Events:** `ClusterDetected` and `AnalysisCompleted`, so you can attach notifications or ticket creation.
+- **Notifications (opt-in):** one queued mail and/or Slack message per analysis at or above a minimum severity, with the root cause and the suggested fix. See [Notifications](#notifications).
+- **Events:** `ClusterDetected` and `AnalysisCompleted`, so you can attach your own notifications or ticket creation.
 - **Reports:** a terminal table, or JSON for scripts and CI.
 - **Extensible:** `LogParser`, `Fingerprinter`, `Redactor` and `LlmClient` are interfaces bound in the container.
 
@@ -185,6 +186,11 @@ All options live in `config/log-insight.php` and can be set via `.env`:
 | `LOG_INSIGHT_BASE_PATH` | `base_path()` | Project root, used to resolve paths and read source excerpts. |
 | `LOG_INSIGHT_QUEUE_CONNECTION` / `LOG_INSIGHT_QUEUE` | default | Queue connection and name for `AnalyzeClusterJob`. |
 | `LOG_INSIGHT_DB_CONNECTION` | default | Database connection for the `log_insight_*` tables. |
+| `LOG_INSIGHT_NOTIFICATIONS_ENABLED` | `false` | Send a notification for severe analyses. See [Notifications](#notifications). |
+| `LOG_INSIGHT_NOTIFICATIONS_MIN_SEVERITY` | `critical` | Lowest severity that notifies: `low`, `medium`, `high`, `critical`. |
+| `LOG_INSIGHT_NOTIFICATIONS_MAIL_TO` | – | Comma-separated mail recipients. Empty sends no mail. |
+| `LOG_INSIGHT_SLACK_WEBHOOK_URL` | – | Slack incoming webhook URL. Needs `laravel/slack-notification-channel`. |
+| `LOG_INSIGHT_SLACK_CHANNEL` | – | Slack channel such as `#errors`, used with your Slack bot token when no webhook URL is set. |
 
 The application directories that count for the "topmost application frame" are set in `fingerprint.app_paths` (default `app/`, `src/`, `routes/`, `database/`). Vendor code never counts.
 
@@ -208,6 +214,32 @@ Trade-offs:
 - **Switching modes starts new clusters.** The frame is part of the fingerprint hash, so errors seen after a switch, in either direction, get new clusters and a new analysis. Existing clusters and analyses stay in the database but no longer receive occurrences, except for errors where `method` falls back to the line form. Switch once, ideally right after a release, and expect a one-off round of AI requests.
 
 `line` stays the default, and its fingerprints are identical to those of earlier versions.
+
+### Notifications
+
+Log Insight can tell your team about severe clusters as soon as their analysis is stored. It is off by default:
+
+```dotenv
+LOG_INSIGHT_NOTIFICATIONS_ENABLED=true
+LOG_INSIGHT_NOTIFICATIONS_MIN_SEVERITY=high
+LOG_INSIGHT_NOTIFICATIONS_MAIL_TO=ops@example.com,dev@example.com
+LOG_INSIGHT_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+```
+
+Every analysis at or above `min_severity` sends exactly one queued notification to all configured routes. It contains the error class, the normalized message, the location, the occurrence count, severity and confidence, the root cause, the suggested fix and the `log-insight:report` command to run for details. Analyses below the threshold, and analyses without any configured route, send nothing.
+
+- **Mail** uses Laravel's built-in `mail` channel and your application's default mailer.
+- **Slack** needs the optional Slack channel package:
+
+  ```bash
+  composer require laravel/slack-notification-channel
+  ```
+
+  Set `LOG_INSIGHT_SLACK_WEBHOOK_URL` to post to an [incoming webhook](https://api.slack.com/messaging/webhooks), or `LOG_INSIGHT_SLACK_CHANNEL` to post as your Slack app, using the bot token in `services.slack.notifications.bot_user_oauth_token` (see the [Laravel docs](https://laravel.com/docs/notifications#slack-notifications)). The webhook URL wins when both are set. If a Slack route is configured but the package is not installed, Log Insight logs a warning that names the missing package and still sends the mail.
+
+Notifications are queued on the same connection and queue as `AnalyzeClusterJob` (`LOG_INSIGHT_QUEUE_CONNECTION` / `LOG_INSIGHT_QUEUE`). The listener is only registered when notifications are enabled, so a disabled installation does no extra work. Changing `LOG_INSIGHT_NOTIFICATIONS_ENABLED` needs a fresh boot, for example `php artisan config:cache` and a queue worker restart.
+
+An invalid `min_severity` throws an exception as soon as the next analysis completes, so a typo never silences the notifications without you noticing. The analysis itself is stored before that.
 
 ### Custom redaction patterns
 
@@ -267,6 +299,8 @@ flowchart LR
 
 ### Reacting to events
 
+For mail and Slack, the built-in [notifications](#notifications) are usually enough. For anything else, listen to the events:
+
 ```php
 use Illuminate\Support\Facades\Event;
 use MarkusDoell\LogInsight\Ai\Severity;
@@ -296,6 +330,8 @@ Log Insight sends data to a third-party AI provider. Please read this before ena
 - values of secret keys such as `password`, `token`, `api_key` or `secret`, in query strings, JSON, PHP arrays, env/YAML style and SQL
 - e-mail addresses and IPv4/IPv6 addresses
 - by default, all string arguments in stack frames
+
+**Notifications:** when enabled, mail and Slack notifications contain the normalized message, the location, the root cause and the suggested fix. They pass the same redaction layer first, and no stack trace or source code is included.
 
 **What is never sent:** vendor source code, files outside your project root (paths from the log are resolved safely, so `../` tricks don't work), and clusters that already have an analysis.
 

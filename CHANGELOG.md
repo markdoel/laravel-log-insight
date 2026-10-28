@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Configurable fingerprint frame (`LOG_INSIGHT_FINGERPRINT_FRAME`, config `fingerprint.frame`). `method` identifies the topmost application frame as `path.php::Class::method`, so deploys that only shift lines keep their clusters. The default `line` keeps the existing fingerprints unchanged. Switching modes starts new clusters.
 - The AI source excerpt for method frames uses the line from the cluster's most recent stack trace.
+- Opt-in notifications for severe clusters (`LOG_INSIGHT_NOTIFICATIONS_ENABLED`, config `notifications`). Every analysis at or above `min_severity` (default `critical`) sends one queued notification with the error, location, occurrence count, severity, confidence, root cause, suggested fix and a `log-insight:report` hint. The content passes the redactor first.
+- Mail notifications via Laravel's `mail` channel (`LOG_INSIGHT_NOTIFICATIONS_MAIL_TO`).
+- Slack notifications via the optional `laravel/slack-notification-channel` package, to an incoming webhook (`LOG_INSIGHT_SLACK_WEBHOOK_URL`) or a channel (`LOG_INSIGHT_SLACK_CHANNEL`). Without the package a warning is logged and mail is still sent.
+- `illuminate/notifications` is now a dependency. It ships with every Laravel application.
 
 ## [1.0.0] - 2026-10-26
 
