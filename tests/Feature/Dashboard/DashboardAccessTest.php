@@ -31,7 +31,7 @@ final class DashboardAccessTest extends DashboardTestCase
     public function it_is_allowed_in_the_local_environment_by_default(): void
     {
         $this->inLocalEnvironment();
-        $this->makeCluster(['app_frame' => 'app/Http/Controllers/OrderController.php:24']);
+        $this->makeCluster(['app_frame' => 'app/Http/Controllers/OrderController.php:24', 'last_seen_at' => now()]);
 
         $this->get('/log-insight')
             ->assertOk()

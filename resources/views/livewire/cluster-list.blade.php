@@ -29,7 +29,7 @@
             </select>
         </label>
 
-        @if ($filtered)
+        @if ($changed)
             <button type="button" class="li-button" wire:click="resetFilters">Reset filters</button>
         @endif
 
@@ -40,8 +40,10 @@
         <div class="li-card li-notice li-notice-error" role="alert">{{ $error }}</div>
     @elseif ($clusters === null || $clusters->total() === 0)
         <div class="li-card li-notice">
-            @if ($filtered)
+            @if ($severity !== '' || $status !== '')
                 No clusters match the filters.
+            @elseif ($filtered)
+                No clusters seen in the {{ lcfirst($timeRanges[$since]) }}. Choose <em>All time</em> to see older clusters.
             @else
                 No clusters stored yet. Run <code>php artisan log-insight:analyze</code> first.
             @endif

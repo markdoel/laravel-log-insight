@@ -247,7 +247,7 @@ An invalid `min_severity` throws an exception as soon as the next analysis compl
 
 ### Dashboard
 
-Log Insight ships a small dashboard for the browser: the stored clusters, most frequent first, with their count, error, message, location, last occurrence, analysis status and severity. You can filter by time range (last hour, 24 hours, 7 days, 30 days), minimum severity and status (`analyzed`, `pending`, `failed`), and page through the results 25 at a time. The filters and the page are kept in the URL, so a filtered view can be bookmarked or shared.
+Log Insight ships a small dashboard for the browser: the stored clusters, most frequent first, with their count, error, message, location, last occurrence, analysis status and severity. You can filter by time range (last hour, 24 hours, 7 days, 30 days or all time; the last 7 days by default), minimum severity and status (`analyzed`, `pending`, `failed`), and page through the results 25 at a time. The filters and the page are kept in the URL, so a filtered view can be bookmarked or shared.
 
 It needs [Livewire](https://livewire.laravel.com) 4, which is an optional dependency, and it is off by default:
 

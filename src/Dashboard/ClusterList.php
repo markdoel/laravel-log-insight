@@ -26,19 +26,23 @@ final class ClusterList extends Component
 
     public const PER_PAGE = 25;
 
+    public const ALL_TIME = 'all';
+
+    public const DEFAULT_TIME_RANGE = '7d';
+
     /**
-     * Time range values (a Since expression or "" for all time) and their labels.
+     * Time range values (a Since expression or "all") and their labels.
      */
     public const TIME_RANGES = [
-        '' => 'All time',
         '1h' => 'Last hour',
         '24h' => 'Last 24 hours',
         '7d' => 'Last 7 days',
         '30d' => 'Last 30 days',
+        self::ALL_TIME => 'All time',
     ];
 
-    #[Url(except: '')]
-    public string $since = '';
+    #[Url(except: self::DEFAULT_TIME_RANGE)]
+    public string $since = self::DEFAULT_TIME_RANGE;
 
     #[Url(except: '')]
     public string $severity = '';
@@ -90,7 +94,7 @@ final class ClusterList extends Component
             $clusters = $this->reports->paginate(
                 perPage: self::PER_PAGE,
                 page: is_numeric($page) ? (int) $page : 1,
-                since: $this->since === '' ? null : Since::parse($this->since),
+                since: $this->since === self::ALL_TIME ? null : Since::parse($this->since),
                 minSeverity: Severity::tryFrom($this->severity),
                 status: $this->status === '' ? null : $this->status,
             );
@@ -103,7 +107,8 @@ final class ClusterList extends Component
         return $this->views->make('log-insight::livewire.cluster-list', [
             'clusters' => $clusters,
             'error' => $error,
-            'filtered' => $this->since !== '' || $this->severity !== '' || $this->status !== '',
+            'filtered' => $this->since !== self::ALL_TIME || $this->severity !== '' || $this->status !== '',
+            'changed' => $this->since !== self::DEFAULT_TIME_RANGE || $this->severity !== '' || $this->status !== '',
             'timeRanges' => self::TIME_RANGES,
             'severities' => Severity::values(),
             'statuses' => ClusterReport::STATUSES,
@@ -116,7 +121,7 @@ final class ClusterList extends Component
     private function normalizeFilters(): void
     {
         if (! array_key_exists($this->since, self::TIME_RANGES)) {
-            $this->since = '';
+            $this->since = self::DEFAULT_TIME_RANGE;
         }
 
         if (Severity::tryFrom($this->severity) === null) {

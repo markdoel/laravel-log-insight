@@ -88,8 +88,34 @@ final class ClusterListTest extends DashboardTestCase
         $component->set('since', '1h');
         $this->assertSame([$this->frequent->id, $this->pending->id], $this->listedIds($component));
 
-        $component->set('since', '');
+        $component->set('since', 'all');
         $this->assertCount(4, $this->listedIds($component));
+    }
+
+    #[Test]
+    public function it_shows_the_last_7_days_by_default(): void
+    {
+        $old = $this->makeCluster(['occurrence_count' => 99, 'last_seen_at' => CarbonImmutable::parse('2026-10-19 11:59:00')]);
+
+        $component = $this->clusterList();
+
+        $component->assertSet('since', '7d');
+        $this->assertNotContains($old->id, $this->listedIds($component));
+        $this->assertCount(4, $this->listedIds($component));
+
+        $component->set('since', 'all');
+        $this->assertSame($old->id, $this->listedIds($component)[0] ?? null);
+    }
+
+    #[Test]
+    public function it_explains_when_the_default_time_range_is_empty(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-11-30 12:00:00'));
+
+        $this->clusterList()
+            ->assertSee('No clusters seen in the last 7 days.')
+            ->assertSee('All time')
+            ->assertDontSee('No clusters match the filters.');
     }
 
     #[Test]
@@ -152,7 +178,7 @@ final class ClusterListTest extends DashboardTestCase
     {
         $component = $this->clusterList(['since' => '1y', 'severity' => 'urgent', 'status' => 'done']);
 
-        $component->assertSet('since', '')->assertSet('severity', '')->assertSet('status', '');
+        $component->assertSet('since', '7d')->assertSet('severity', '')->assertSet('status', '');
         $this->assertCount(4, $this->listedIds($component));
     }
 
@@ -164,7 +190,7 @@ final class ClusterListTest extends DashboardTestCase
             ->set('severity', 'critical')
             ->assertSee('No clusters match the filters.')
             ->call('resetFilters')
-            ->assertSet('since', '')
+            ->assertSet('since', '7d')
             ->assertSet('severity', '');
 
         $this->assertCount(4, $this->listedIds($component));
@@ -175,7 +201,7 @@ final class ClusterListTest extends DashboardTestCase
     {
         Cluster::query()->delete();
 
-        $this->clusterList()
+        $this->clusterList(['since' => 'all'])
             ->assertSee('No clusters stored yet.')
             ->assertSee('log-insight:analyze');
     }
