@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace MarkusDoell\LogInsight;
 
+use Illuminate\Contracts\Auth\Access\Gate;
 use Illuminate\Contracts\Bus\Dispatcher as BusDispatcher;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Events\Dispatcher as EventDispatcher;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Notifications\Dispatcher as NotificationDispatcher;
 use Illuminate\Http\Client\Factory as HttpFactory;
+use Illuminate\Routing\Router;
 use Illuminate\Support\ServiceProvider;
+use Livewire\Livewire;
 use MarkusDoell\LogInsight\Ai\AnalysisScheduler;
 use MarkusDoell\LogInsight\Ai\ClusterContextBuilder;
 use MarkusDoell\LogInsight\Ai\Severity;
@@ -21,6 +24,9 @@ use MarkusDoell\LogInsight\Contracts\Fingerprinter;
 use MarkusDoell\LogInsight\Contracts\LlmClient;
 use MarkusDoell\LogInsight\Contracts\LogParser;
 use MarkusDoell\LogInsight\Contracts\Redactor;
+use MarkusDoell\LogInsight\Dashboard\ClusterList;
+use MarkusDoell\LogInsight\Dashboard\DashboardController;
+use MarkusDoell\LogInsight\Dashboard\LivewireSupport;
 use MarkusDoell\LogInsight\Data\LogLevel;
 use MarkusDoell\LogInsight\Events\AnalysisCompleted;
 use MarkusDoell\LogInsight\Exceptions\LogInsightException;
@@ -139,6 +145,8 @@ final class LogInsightServiceProvider extends ServiceProvider
             );
         });
 
+        $this->app->singletonIf(LivewireSupport::class, static fn (): LivewireSupport => LivewireSupport::detect());
+
         $this->app->singleton(SlackChannelSupport::class, static fn (): SlackChannelSupport => SlackChannelSupport::detect());
 
         $this->app->singleton(ClusterNotifier::class, static function (Application $app): ClusterNotifier {
@@ -164,8 +172,16 @@ final class LogInsightServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        if ((bool) $this->app->make(Repository::class)->get('log-insight.notifications.enabled', false)) {
+        $config = $this->app->make(Repository::class);
+
+        if ((bool) $config->get('log-insight.notifications.enabled', false)) {
             $this->app->make(EventDispatcher::class)->listen(AnalysisCompleted::class, SendSevereClusterNotification::class);
+        }
+
+        $this->loadViewsFrom(__DIR__.'/../resources/views', 'log-insight');
+
+        if ((bool) $config->get('log-insight.dashboard.enabled', false)) {
+            $this->bootDashboard($config);
         }
 
         if ($this->app->runningInConsole()) {
@@ -177,11 +193,47 @@ final class LogInsightServiceProvider extends ServiceProvider
                 __DIR__.'/../database/migrations' => database_path('migrations'),
             ], 'log-insight-migrations');
 
+            $this->publishes([
+                __DIR__.'/../resources/views' => resource_path('views/vendor/log-insight'),
+            ], 'log-insight-views');
+
             $this->commands([
                 AnalyzeCommand::class,
                 ReportCommand::class,
             ]);
         }
+    }
+
+    private function bootDashboard(Repository $config): void
+    {
+        $gate = $this->app->make(Gate::class);
+
+        // Like Horizon and Telescope: local only, until the application defines the gate.
+        if (! $gate->has('viewLogInsight')) {
+            $app = $this->app;
+            $gate->define('viewLogInsight', static fn (mixed $user = null): bool => $app->environment('local') === true);
+        }
+
+        if ($this->app->make(LivewireSupport::class)->installed) {
+            Livewire::component(ClusterList::NAME, ClusterList::class);
+        }
+
+        if ($this->app->routesAreCached()) {
+            return;
+        }
+
+        $middleware = $config->get('log-insight.dashboard.middleware', ['web']);
+
+        $this->app->make(Router::class)
+            ->middleware([
+                ...(is_array($middleware) ? array_values(array_filter($middleware, is_string(...))) : ['web']),
+                'can:viewLogInsight',
+            ])
+            ->prefix(trim(self::configString($config, 'log-insight.dashboard.path', 'log-insight'), '/'))
+            ->name('log-insight.')
+            ->group(static function (Router $router): void {
+                $router->get('/', DashboardController::class)->name('dashboard');
+            });
     }
 
     private static function configNullableString(Repository $config, string $key): ?string

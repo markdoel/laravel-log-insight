@@ -186,6 +186,28 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Dashboard
+    |--------------------------------------------------------------------------
+    |
+    | A browser dashboard with the cluster list at /{path}. It needs the
+    | optional livewire/livewire package and is off by default.
+    |
+    | Access is controlled by the "viewLogInsight" gate, which only allows
+    | the local environment unless you define it yourself, e.g. in
+    | AppServiceProvider::boot():
+    |
+    |   Gate::define('viewLogInsight', fn ($user) => $user->isAdmin());
+    |
+    */
+
+    'dashboard' => [
+        'enabled' => (bool) env('LOG_INSIGHT_DASHBOARD_ENABLED', false),
+        'path' => env('LOG_INSIGHT_DASHBOARD_PATH', 'log-insight'),
+        'middleware' => ['web'],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Database
     |--------------------------------------------------------------------------
     |
