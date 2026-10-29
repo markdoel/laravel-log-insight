@@ -6,6 +6,7 @@ namespace MarkusDoell\LogInsight\Tests\Feature\Dashboard;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Livewire\Component;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use MarkusDoell\LogInsight\Ai\Severity;
@@ -239,7 +240,7 @@ final class ClusterListTest extends DashboardTestCase
 
     /**
      * @param  array<string, string>  $query
-     * @return Testable<ClusterList>
+     * @return Testable<Component>
      */
     private function clusterList(array $query = []): Testable
     {
@@ -247,7 +248,7 @@ final class ClusterListTest extends DashboardTestCase
     }
 
     /**
-     * @param  Testable<ClusterList>  $component
+     * @param  Testable<Component>  $component
      * @return LengthAwarePaginator<array-key, mixed>
      */
     private function paginator(Testable $component): LengthAwarePaginator
@@ -259,7 +260,7 @@ final class ClusterListTest extends DashboardTestCase
     }
 
     /**
-     * @param  Testable<ClusterList>  $component
+     * @param  Testable<Component>  $component
      * @return list<int>
      */
     private function listedIds(Testable $component): array
