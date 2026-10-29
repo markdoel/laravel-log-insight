@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Mail notifications via Laravel's `mail` channel (`LOG_INSIGHT_NOTIFICATIONS_MAIL_TO`).
 - Slack notifications via the optional `laravel/slack-notification-channel` package, to an incoming webhook (`LOG_INSIGHT_SLACK_WEBHOOK_URL`) or a channel (`LOG_INSIGHT_SLACK_CHANNEL`). Without the package a warning is logged and mail is still sent.
 - `illuminate/notifications` is now a dependency. It ships with every Laravel application.
+- Opt-in Livewire dashboard with the cluster list (`LOG_INSIGHT_DASHBOARD_ENABLED`, config `dashboard`): count, error, message, location, last seen, analysis status and severity, filters for time range, minimum severity and status, and pagination. Filters and page are kept in the query string. Path (`LOG_INSIGHT_DASHBOARD_PATH`, default `log-insight`) and middleware (default `['web']`) are configurable.
+- `viewLogInsight` gate for the dashboard. It only allows the local environment unless the application defines it. It is checked on the page and on every Livewire request.
+- Publishable dashboard views (`--tag=log-insight-views`) with self-contained CSS for light and dark mode, no build step.
+- `livewire/livewire` (^4.0) is suggested, not required. Without it the enabled dashboard answers with `503` and the install command, and everything else works as before.
+- `ClusterReport::paginate()` returns one page of report rows, filtered like `build()` plus an optional analysis status. `build()` is unchanged.
 
 ## [1.0.0] - 2026-10-26
 

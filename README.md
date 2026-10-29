@@ -23,6 +23,7 @@ Instead of scrolling through thousands of log lines, you get a short list: *this
 - **Notifications (opt-in):** one queued mail and/or Slack message per analysis at or above a minimum severity, with the root cause and the suggested fix. See [Notifications](#notifications).
 - **Events:** `ClusterDetected` and `AnalysisCompleted`, so you can attach your own notifications or ticket creation.
 - **Reports:** a terminal table, or JSON for scripts and CI.
+- **Dashboard (opt-in):** a Livewire page in your app with the cluster list, filters for time range, minimum severity and analysis status, and pagination. Protected by a gate that only allows the local environment by default. See [Dashboard](#dashboard).
 - **Extensible:** `LogParser`, `Fingerprinter`, `Redactor` and `LlmClient` are interfaces bound in the container.
 
 ## Requirements
@@ -191,6 +192,9 @@ All options live in `config/log-insight.php` and can be set via `.env`:
 | `LOG_INSIGHT_NOTIFICATIONS_MAIL_TO` | – | Comma-separated mail recipients. Empty sends no mail. |
 | `LOG_INSIGHT_SLACK_WEBHOOK_URL` | – | Slack incoming webhook URL. Needs `laravel/slack-notification-channel`. |
 | `LOG_INSIGHT_SLACK_CHANNEL` | – | Slack channel such as `#errors`, used with your Slack bot token when no webhook URL is set. |
+| `LOG_INSIGHT_DASHBOARD_ENABLED` | `false` | Register the dashboard route. Needs `livewire/livewire`. See [Dashboard](#dashboard). |
+| `LOG_INSIGHT_DASHBOARD_PATH` | `log-insight` | URL path of the dashboard. |
+| `dashboard.middleware` (config only) | `['web']` | Middleware for the dashboard route. The `viewLogInsight` gate is always added. |
 
 The application directories that count for the "topmost application frame" are set in `fingerprint.app_paths` (default `app/`, `src/`, `routes/`, `database/`). Vendor code never counts.
 
@@ -241,6 +245,55 @@ Notifications are queued on the same connection and queue as `AnalyzeClusterJob`
 
 An invalid `min_severity` throws an exception as soon as the next analysis completes, so a typo never silences the notifications without you noticing. The analysis itself is stored before that.
 
+### Dashboard
+
+Log Insight ships a small dashboard for the browser: the stored clusters, most frequent first, with their count, error, message, location, last occurrence, analysis status and severity. You can filter by time range (last hour, 24 hours, 7 days, 30 days), minimum severity and status (`analyzed`, `pending`, `failed`), and page through the results 25 at a time. The filters and the page are kept in the URL, so a filtered view can be bookmarked or shared.
+
+It needs [Livewire](https://livewire.laravel.com) 4, which is an optional dependency, and it is off by default:
+
+```bash
+composer require livewire/livewire
+```
+
+```dotenv
+LOG_INSIGHT_DASHBOARD_ENABLED=true
+# LOG_INSIGHT_DASHBOARD_PATH=log-insight
+```
+
+Then open `/log-insight`. If the dashboard is enabled but Livewire is not installed, the page answers with `503` and the `composer require` command instead of an error. Nothing else in the package depends on Livewire.
+
+The route uses the `web` middleware group by default. To change it, publish the config and edit `dashboard.middleware`, for example `['web', 'auth']`.
+
+#### Authorization
+
+Access is controlled by the `viewLogInsight` [gate](https://laravel.com/docs/authorization#gates), like Horizon and Telescope. Out of the box it only allows requests while `APP_ENV` is `local`, so the dashboard is closed in production until you decide who may see it. Define the gate yourself, usually in `App\Providers\AppServiceProvider::boot()`:
+
+```php
+use App\Models\User;
+use Illuminate\Support\Facades\Gate;
+
+public function boot(): void
+{
+    Gate::define('viewLogInsight', function (User $user) {
+        return in_array($user->email, [
+            'admin@example.com',
+        ]);
+    });
+}
+```
+
+Your definition replaces the default one, also in the local environment. A gate whose first parameter is not nullable never allows guests, so add `auth` to `dashboard.middleware` if guests should be redirected to the login page instead of getting a `403`. The gate is checked on the page request and on every Livewire request the page makes, so filtering and paging are protected too.
+
+#### Customizing the views
+
+The dashboard uses Blade views with their own CSS: no build step, no Tailwind, nothing to compile. It follows the operating system's light or dark mode. To change the markup, publish the views:
+
+```bash
+php artisan vendor:publish --tag=log-insight-views
+```
+
+They are copied to `resources/views/vendor/log-insight`. The styles live in `partials/styles.blade.php`.
+
 ### Custom redaction patterns
 
 ```php
@@ -286,10 +339,10 @@ flowchart LR
     Validator --> DB
     Validator -. "AnalysisCompleted" .-> Listeners
 
-    DB --> Report["log-insight:report<br/>(ClusterReport)"]
+    DB --> Report["log-insight:report<br/>dashboard<br/>(ClusterReport)"]
 ```
 
-- **Commands only call services.** `AnalyzeCommand` delegates to `LogAnalyzer`, `ReportCommand` to `ClusterReport`.
+- **Commands only call services.** `AnalyzeCommand` delegates to `LogAnalyzer`, `ReportCommand` to `ClusterReport`. The dashboard's `ClusterList` component uses `ClusterReport` too.
 - **Everything that leaves the server passes the `Redactor`.** That is the only way from `ClusterContextBuilder` to `LlmClient`.
 - **Contracts in `src/Contracts`** can be rebound in the container. To use another AI provider, implement `LlmClient` and bind it:
 
