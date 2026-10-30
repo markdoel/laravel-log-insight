@@ -25,6 +25,7 @@ use MarkusDoell\LogInsight\Contracts\LlmClient;
 use MarkusDoell\LogInsight\Contracts\LogParser;
 use MarkusDoell\LogInsight\Contracts\Redactor;
 use MarkusDoell\LogInsight\Dashboard\ClusterList;
+use MarkusDoell\LogInsight\Dashboard\ClusterPage;
 use MarkusDoell\LogInsight\Dashboard\DashboardController;
 use MarkusDoell\LogInsight\Dashboard\LivewireSupport;
 use MarkusDoell\LogInsight\Data\LogLevel;
@@ -216,6 +217,7 @@ final class LogInsightServiceProvider extends ServiceProvider
 
         if ($this->app->make(LivewireSupport::class)->installed) {
             Livewire::component(ClusterList::NAME, ClusterList::class);
+            Livewire::component(ClusterPage::NAME, ClusterPage::class);
         }
 
         if ($this->app->routesAreCached()) {
@@ -233,6 +235,7 @@ final class LogInsightServiceProvider extends ServiceProvider
             ->name('log-insight.')
             ->group(static function (Router $router): void {
                 $router->get('/', DashboardController::class)->name('dashboard');
+                $router->get('/clusters/{cluster}', [DashboardController::class, 'show'])->whereNumber('cluster')->name('cluster');
             });
     }
 
