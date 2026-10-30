@@ -8,7 +8,7 @@ use Illuminate\Contracts\View\Factory as ViewFactory;
 use Illuminate\Http\Response;
 
 /**
- * Serves the dashboard page, or explains how to install Livewire.
+ * Serves the dashboard pages, or explains how to install Livewire.
  */
 final readonly class DashboardController
 {
@@ -17,7 +17,27 @@ final readonly class DashboardController
         private ViewFactory $views,
     ) {}
 
+    /**
+     * The cluster list.
+     */
     public function __invoke(): Response
+    {
+        return $this->page('log-insight::dashboard');
+    }
+
+    /**
+     * The detail page of one cluster.
+     */
+    public function show(int $cluster): Response
+    {
+        return $this->page('log-insight::cluster', ['clusterId' => $cluster]);
+    }
+
+    /**
+     * @param  view-string  $view
+     * @param  array<string, mixed>  $data
+     */
+    private function page(string $view, array $data = []): Response
     {
         if (! $this->livewire->installed) {
             return new Response(
@@ -26,6 +46,6 @@ final readonly class DashboardController
             );
         }
 
-        return new Response($this->views->make('log-insight::dashboard')->render());
+        return new Response($this->views->make($view, $data)->render());
     }
 }

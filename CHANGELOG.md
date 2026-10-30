@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Publishable dashboard views (`--tag=log-insight-views`) with self-contained CSS for light and dark mode, no build step.
 - `livewire/livewire` (^4.0) is suggested, not required. Without it the enabled dashboard answers with `503` and the install command, and everything else works as before.
 - `ClusterReport::paginate()` returns one page of report rows, filtered like `build()` plus an optional analysis status. `build()` is unchanged.
+- Dashboard cluster detail page at `{path}/clusters/{id}`: cluster facts, the latest analysis (root cause, suggested fix, affected files, severity, confidence, provider and model), the failure reason of a failed analysis, the stack trace, occurrences per day for the last 14 days as an inline SVG bar chart with a table view, and the 20 latest occurrences. The messages in the cluster list link to it.
+- "Retry analysis" on the detail page of a cluster whose analysis failed: clears `analysis_failed_at` and `analysis_error` and queues `AnalyzeClusterJob` again. Analyzed clusters are never sent again. The action is behind the `viewLogInsight` gate like the rest of the dashboard.
+- `AnalysisScheduler::canRetry()` and `AnalysisScheduler::retry()`, and `ClusterDetailReport::find()` for the data of the detail page.
 
 ## [1.0.0] - 2026-10-26
 

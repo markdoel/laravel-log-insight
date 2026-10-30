@@ -100,6 +100,41 @@
     .li-status-failed { background: var(--li-critical-bg); color: var(--li-critical-fg); }
     .li-status-analyzed { background: var(--li-low-bg); color: var(--li-low-fg); }
 
+    .li-row-link { color: inherit; text-decoration: none; }
+    .li-row-link:hover { color: var(--li-accent); text-decoration: underline; }
+
+    .li-back { color: var(--li-muted); text-decoration: none; align-self: flex-start; }
+    .li-back:hover { color: var(--li-accent); }
+    .li-section { padding: 16px; }
+    .li-section > :last-child { margin-bottom: 0; }
+    h2 { font-size: 15px; margin: 0 0 12px; }
+    h3 { font-size: 13px; margin: 16px 0 4px; color: var(--li-muted); }
+    .li-title-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+    .li-title-row h1 { margin-right: 4px; }
+    .li-lead { margin: 0 0 16px; font-size: 15px; }
+    .li-break { overflow-wrap: anywhere; }
+    .li-prose { margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
+    .li-facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px 24px; margin: 0; }
+    .li-facts dt { font-size: 12px; color: var(--li-muted); }
+    .li-facts dd { margin: 0; }
+    .li-fact-wide { grid-column: 1 / -1; }
+    .li-files { margin: 0; padding-left: 20px; }
+    .li-failure { padding: 12px; border: 1px solid var(--li-critical-fg); border-radius: 6px; }
+    .li-failure .li-prose { margin-top: 4px; color: var(--li-text); }
+    .li-actions { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+    .li-trace { margin: 0; max-height: 480px; font-size: 12px; }
+
+    .li-chart { margin: 0 0 12px; }
+    .li-chart svg { display: block; width: 100%; height: 120px; }
+    .li-chart-baseline { stroke: var(--li-border); stroke-width: 1; }
+    .li-chart-hit { fill: transparent; }
+    .li-chart-bar { fill: var(--li-accent); }
+    .li-chart-day:hover .li-chart-bar { opacity: .75; }
+    .li-chart-labels { display: grid; margin-top: 4px; font-size: 11px; color: var(--li-muted); text-align: center; font-variant-numeric: tabular-nums; }
+    .li-chart-today { color: var(--li-text); font-weight: 600; }
+    .li-table-compact { width: auto; margin-top: 8px; }
+    .li-table-compact th, .li-table-compact td { padding: 4px 12px; }
+
     .li-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
     .li-pagination { display: flex; align-items: center; gap: 12px; }
 </style>
