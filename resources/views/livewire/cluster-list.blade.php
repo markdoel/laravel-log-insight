@@ -74,7 +74,7 @@
                                     <span class="li-level">{{ strtoupper($cluster->level->value) }}</span>
                                 @endif
                             </td>
-                            <td class="li-message" title="{{ $cluster->message }}">{{ \Illuminate\Support\Str::limit($cluster->message, 120) }}</td>
+                            <td class="li-message" title="{{ $cluster->message }}"><a class="li-row-link" href="{{ route('log-insight.cluster', $cluster->id) }}">{{ \Illuminate\Support\Str::limit($cluster->message, 120) }}</a></td>
                             <td class="li-code">
                                 @if ($cluster->app_frame !== null)
                                     {{-- Allow line breaks after path separators only. --}}
