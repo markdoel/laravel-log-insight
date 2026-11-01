@@ -19,11 +19,11 @@ Instead of scrolling through thousands of log lines, you get a short list: *this
 - **Cost control:**
   - A cluster that already has an analysis is never sent again.
   - Invalid answers get exactly one correction request.
-  - Permanent failures are recorded and not retried.
+  - Permanent failures are recorded and not retried automatically. They can be retried by hand from the dashboard.
 - **Notifications (opt-in):** one queued mail and/or Slack message per analysis at or above a minimum severity, with the root cause and the suggested fix. See [Notifications](#notifications).
 - **Events:** `ClusterDetected` and `AnalysisCompleted`, so you can attach your own notifications or ticket creation.
 - **Reports:** a terminal table, or JSON for scripts and CI.
-- **Dashboard (opt-in):** a Livewire page in your app with the cluster list, filters for time range, minimum severity and analysis status, and pagination. Protected by a gate that only allows the local environment by default. See [Dashboard](#dashboard).
+- **Dashboard (opt-in):** a Livewire page in your app with the cluster list, filters for time range, minimum severity and analysis status, and pagination, plus a detail page per cluster with the analysis, stack trace, a 14-day chart and the latest occurrences. Protected by a gate that only allows the local environment by default. See [Dashboard](#dashboard).
 - **Extensible:** `LogParser`, `Fingerprinter`, `Redactor` and `LlmClient` are interfaces bound in the container.
 
 ## Requirements
@@ -192,9 +192,9 @@ All options live in `config/log-insight.php` and can be set via `.env`:
 | `LOG_INSIGHT_NOTIFICATIONS_MAIL_TO` | – | Comma-separated mail recipients. Empty sends no mail. |
 | `LOG_INSIGHT_SLACK_WEBHOOK_URL` | – | Slack incoming webhook URL. Needs `laravel/slack-notification-channel`. |
 | `LOG_INSIGHT_SLACK_CHANNEL` | – | Slack channel such as `#errors`, used with your Slack bot token when no webhook URL is set. |
-| `LOG_INSIGHT_DASHBOARD_ENABLED` | `false` | Register the dashboard route. Needs `livewire/livewire`. See [Dashboard](#dashboard). |
-| `LOG_INSIGHT_DASHBOARD_PATH` | `log-insight` | URL path of the dashboard. |
-| `dashboard.middleware` (config only) | `['web']` | Middleware for the dashboard route. The `viewLogInsight` gate is always added. |
+| `LOG_INSIGHT_DASHBOARD_ENABLED` | `false` | Register the dashboard routes (cluster list and cluster detail page). Needs `livewire/livewire`. See [Dashboard](#dashboard). |
+| `LOG_INSIGHT_DASHBOARD_PATH` | `log-insight` | URL path of the dashboard. Cluster pages live at `{path}/clusters/{id}`. |
+| `dashboard.middleware` (config only) | `['web']` | Middleware for the dashboard routes. The `viewLogInsight` gate is always added. |
 
 The application directories that count for the "topmost application frame" are set in `fingerprint.app_paths` (default `app/`, `src/`, `routes/`, `database/`). Vendor code never counts.
 
@@ -249,6 +249,19 @@ An invalid `min_severity` throws an exception as soon as the next analysis compl
 
 Log Insight ships a small dashboard for the browser: the stored clusters, most frequent first, with their count, error, message, location, last occurrence, analysis status and severity. You can filter by time range (last hour, 24 hours, 7 days, 30 days or all time; the last 7 days by default), minimum severity and status (`analyzed`, `pending`, `failed`), and page through the results 25 at a time. The filters and the page are kept in the URL, so a filtered view can be bookmarked or shared.
 
+Click a message to open the cluster's detail page at `/log-insight/clusters/{id}`. It shows:
+
+- the cluster facts: error, normalized and latest message, occurrence count, level, first and last occurrence, location, the file and line it was thrown in and the fingerprint,
+- the latest analysis: root cause, suggested fix, affected files, severity, confidence, provider and model,
+- for a failed analysis, the recorded failure reason,
+- the occurrences per day for the last 14 days (today included, in app time) as a small inline SVG bar chart, with a table view,
+- the stack trace of the most recent occurrence,
+- the 20 most recent occurrences with time, level, channel and message.
+
+#### Retrying a failed analysis
+
+When an analysis failed permanently, for example because the provider rejected the request, the cluster is not sent again automatically. Its detail page shows the failure reason and a **Retry analysis** button. Retrying clears `analysis_failed_at` and `analysis_error` and queues a new `AnalyzeClusterJob` on the configured queue connection and queue, so a queue worker has to run. The button only exists for failed clusters: a cluster that has an analysis is never sent again, and pending clusters are queued by `log-insight:analyze` as before. With analysis disabled or without an API key the page explains why the button is missing. Clicking twice, or in two tabs, queues the cluster once.
+
 It needs [Livewire](https://livewire.laravel.com) 4, which is an optional dependency, and it is off by default:
 
 ```bash
@@ -282,7 +295,7 @@ public function boot(): void
 }
 ```
 
-Your definition replaces the default one, also in the local environment. A gate whose first parameter is not nullable never allows guests, so add `auth` to `dashboard.middleware` if guests should be redirected to the login page instead of getting a `403`. The gate is checked on the page request and on every Livewire request the page makes, so filtering and paging are protected too.
+Your definition replaces the default one, also in the local environment. A gate whose first parameter is not nullable never allows guests, so add `auth` to `dashboard.middleware` if guests should be redirected to the login page instead of getting a `403`. The gate is checked on the page request and on every Livewire request the page makes, so filtering, paging and retrying a failed analysis are protected too. Anyone who can see the dashboard can retry a failed analysis.
 
 #### Customizing the views
 
@@ -342,7 +355,7 @@ flowchart LR
     DB --> Report["log-insight:report<br/>dashboard<br/>(ClusterReport)"]
 ```
 
-- **Commands only call services.** `AnalyzeCommand` delegates to `LogAnalyzer`, `ReportCommand` to `ClusterReport`. The dashboard's `ClusterList` component uses `ClusterReport` too.
+- **Commands only call services.** `AnalyzeCommand` delegates to `LogAnalyzer`, `ReportCommand` to `ClusterReport`. The dashboard's `ClusterList` component uses `ClusterReport` too, `ClusterPage` uses `ClusterDetailReport` and `AnalysisScheduler`.
 - **Everything that leaves the server passes the `Redactor`.** That is the only way from `ClusterContextBuilder` to `LlmClient`.
 - **Contracts in `src/Contracts`** can be rebound in the container. To use another AI provider, implement `LlmClient` and bind it:
 
