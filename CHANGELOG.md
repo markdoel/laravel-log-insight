@@ -23,6 +23,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dashboard cluster detail page at `{path}/clusters/{id}`: cluster facts, the latest analysis (root cause, suggested fix, affected files, severity, confidence, provider and model), the failure reason of a failed analysis, the stack trace, occurrences per day for the last 14 days as an inline SVG bar chart with a table view, and the 20 latest occurrences. The messages in the cluster list link to it.
 - "Retry analysis" on the detail page of a cluster whose analysis failed: clears `analysis_failed_at` and `analysis_error` and queues `AnalyzeClusterJob` again. Analyzed clusters are never sent again. The action is behind the `viewLogInsight` gate like the rest of the dashboard.
 - `AnalysisScheduler::canRetry()` and `AnalysisScheduler::retry()`, and `ClusterDetailReport::find()` for the data of the detail page.
+- Opt-in similar clusters across different fingerprints with Voyage AI embeddings (`LOG_INSIGHT_SIMILARITY_ENABLED`, config `similarity`). Without `VOYAGE_API_KEY` the feature stays off. Model (`LOG_INSIGHT_EMBEDDING_MODEL`, default `voyage-4`), threshold (`LOG_INSIGHT_SIMILARITY_THRESHOLD`, default `0.85`), limit (`LOG_INSIGHT_SIMILARITY_LIMIT`, default `5`), base URL (`LOG_INSIGHT_VOYAGE_BASE_URL`, default `https://ai.mongodb.com`) and timeout (`LOG_INSIGHT_EMBEDDING_TIMEOUT`) are configurable.
+- `EmbeddingClient` interface and `VoyageEmbeddingClient` on Laravel's HTTP client, with the same retries and `retry-after` handling as the Anthropic client.
+- New, separately publishable migration for the `log_insight_cluster_embeddings` table (`--tag=log-insight-similarity-migrations`). The existing migration is unchanged.
+- `EmbedClusterJob`, queued for every new cluster through a `ClusterDetected` listener that is only registered when the feature is enabled. The embedded text (exception class or level, normalized message, application frame) passes the redactor.
+- `SimilarClusters` service that ranks clusters by cosine similarity of their vectors, for one or many clusters in one pass.
+- `log-insight:similar {cluster}` command with `--limit`, `--threshold` and `--json`.
+- `log-insight:embed` command that queues embeddings for clusters stored before the feature was enabled.
+- `log-insight:report --json` adds a `similar` list to every cluster when the feature is enabled. The output is unchanged otherwise.
+- "Similar clusters" section on the dashboard's cluster page when the feature is enabled.
+- `Report::withSimilar()` and an optional `similar` constructor argument; `Cluster::embeddings()` relation.
+
+### Changed
+
+- The HTTP retry rules of `AnthropicClient` moved to the shared `Http\RetryPolicy`. Behaviour is unchanged.
 
 ## [1.0.0] - 2026-10-26
 
