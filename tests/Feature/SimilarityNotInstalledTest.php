@@ -32,14 +32,26 @@ final class SimilarityNotInstalledTest extends TestCase
     {
         parent::defineEnvironment($app);
 
+        $app['config']->set('database.connections.without_similarity', ['driver' => 'sqlite', 'database' => ':memory:', 'prefix' => '', 'foreign_key_constraints' => true]);
+        $app['config']->set('log-insight.database.connection', 'without_similarity');
+
         // The listener is registered while the provider boots, so this cannot wait for setUp().
         $app['config']->set('log-insight.similarity.enabled', true);
         $app['config']->set('log-insight.similarity.api_key', 'voyage-test-key');
     }
 
+    /**
+     * Only the original migration, on a connection of its own, so tables
+     * that other tests created on a shared MySQL or Postgres database do
+     * not leak in.
+     */
     protected function defineDatabaseMigrations(): void
     {
-        $this->loadMigrationsFrom(__DIR__.'/../../database/migrations');
+        $this->loadMigrationsFrom([
+            '--database' => 'without_similarity',
+            '--path' => (string) realpath(__DIR__.'/../../database/migrations'),
+            '--realpath' => true,
+        ]);
     }
 
     #[Test]
