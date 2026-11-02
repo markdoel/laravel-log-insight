@@ -41,7 +41,7 @@ final class ServiceProviderTest extends TestCase
 
         $this->assertCount(1, $paths);
         $this->assertFileExists(array_key_first($paths).'/create_log_insight_tables.php');
-        $this->assertFileDoesNotExist(array_key_first($paths).'/create_log_insight_cluster_embeddings_table.php');
+        $this->assertFileDoesNotExist(array_key_first($paths).'/create_log_insight_tables_cluster_embeddings.php');
     }
 
     #[Test]
@@ -50,7 +50,7 @@ final class ServiceProviderTest extends TestCase
         $paths = ServiceProvider::pathsToPublish(LogInsightServiceProvider::class, 'log-insight-similarity-migrations');
 
         $this->assertCount(1, $paths);
-        $this->assertSame(['create_log_insight_cluster_embeddings_table.php'], array_values(array_diff((array) scandir((string) array_key_first($paths)), ['.', '..'])));
+        $this->assertSame(['create_log_insight_tables_cluster_embeddings.php'], array_values(array_diff((array) scandir((string) array_key_first($paths)), ['.', '..'])));
         $this->assertSame(database_path('migrations'), array_values($paths)[0]);
     }
 
