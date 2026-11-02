@@ -13,6 +13,8 @@ use MarkusDoell\LogInsight\Ai\AnalysisScheduler;
 use MarkusDoell\LogInsight\Exceptions\LogInsightException;
 use MarkusDoell\LogInsight\Reporting\ClusterDetailReport;
 use MarkusDoell\LogInsight\Reporting\ReportRow;
+use MarkusDoell\LogInsight\Similarity\SimilarCluster;
+use MarkusDoell\LogInsight\Similarity\SimilarClusters;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
@@ -33,17 +35,20 @@ final class ClusterPage extends Component
 
     private ViewFactory $views;
 
+    private SimilarClusters $similarClusters;
+
     /**
      * Runs on every request, including Livewire updates, so the retry
      * action is protected by the gate as well as the initial page load.
      */
-    public function boot(Gate $gate, ClusterDetailReport $details, AnalysisScheduler $scheduler, ViewFactory $views): void
+    public function boot(Gate $gate, ClusterDetailReport $details, AnalysisScheduler $scheduler, ViewFactory $views, SimilarClusters $similarClusters): void
     {
         $gate->authorize('viewLogInsight');
 
         $this->details = $details;
         $this->scheduler = $scheduler;
         $this->views = $views;
+        $this->similarClusters = $similarClusters;
     }
 
     public function mount(int $clusterId): void
@@ -79,13 +84,37 @@ final class ClusterPage extends Component
         }
 
         $failed = $detail?->row->status() === ReportRow::STATUS_FAILED;
+        [$similar, $similarError] = $detail === null ? [null, null] : $this->similar();
 
         return $this->views->make('log-insight::livewire.cluster-page', [
             'detail' => $detail,
             'error' => $error,
             'canRetry' => $failed && $this->scheduler->canRetry($detail->row->cluster),
             'retryBlockedReason' => $failed ? $this->retryBlockedReason() : null,
+            'similarityEnabled' => $this->similarClusters->isEnabled(),
+            'similar' => $similar,
+            'similarError' => $similarError,
+            'similarThreshold' => $this->similarClusters->threshold(),
         ]);
+    }
+
+    /**
+     * Similar clusters, or null without an embedding yet, and the reason
+     * when they cannot be loaded, e.g. a missing migration.
+     *
+     * @return array{0: list<SimilarCluster>|null, 1: string|null}
+     */
+    private function similar(): array
+    {
+        if (! $this->similarClusters->isEnabled()) {
+            return [null, null];
+        }
+
+        try {
+            return [$this->similarClusters->forCluster($this->clusterId), null];
+        } catch (LogInsightException $exception) {
+            return [null, $exception->getMessage()];
+        }
     }
 
     /**
