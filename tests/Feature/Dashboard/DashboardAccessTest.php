@@ -257,6 +257,8 @@ final class DashboardAccessTest extends DashboardTestCase
 
     private function dropLogInsightTables(): void
     {
+        // References log_insight_clusters, so MySQL and Postgres need it gone first.
+        Schema::dropIfExists('log_insight_cluster_embeddings');
         Schema::dropIfExists('log_insight_analyses');
         Schema::dropIfExists('log_insight_occurrences');
         Schema::dropIfExists('log_insight_clusters');
