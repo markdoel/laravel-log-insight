@@ -58,6 +58,17 @@ class Cluster extends Model
     }
 
     /**
+     * Embedding vectors, one per embedding model. Only used when similar
+     * clusters are enabled; the table comes with a separate migration.
+     *
+     * @return HasMany<ClusterEmbedding, $this>
+     */
+    public function embeddings(): HasMany
+    {
+        return $this->hasMany(ClusterEmbedding::class);
+    }
+
+    /**
      * @return HasOne<Analysis, $this>
      */
     public function latestAnalysis(): HasOne

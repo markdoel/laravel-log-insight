@@ -6,6 +6,7 @@ namespace MarkusDoell\LogInsight\Storage;
 
 use MarkusDoell\LogInsight\Exceptions\NotInstalled;
 use MarkusDoell\LogInsight\Models\Cluster;
+use MarkusDoell\LogInsight\Models\ClusterEmbedding;
 
 /**
  * Turns a forgotten migration into a helpful message instead of an SQL error.
@@ -13,6 +14,8 @@ use MarkusDoell\LogInsight\Models\Cluster;
 final class InstallationCheck
 {
     private bool $verified = false;
+
+    private bool $similarityVerified = false;
 
     public function ensureInstalled(): void
     {
@@ -27,5 +30,25 @@ final class InstallationCheck
         }
 
         $this->verified = true;
+    }
+
+    /**
+     * The embeddings table comes with its own, separately published migration.
+     */
+    public function ensureSimilarityInstalled(): void
+    {
+        $this->ensureInstalled();
+
+        if ($this->similarityVerified) {
+            return;
+        }
+
+        $embedding = new ClusterEmbedding;
+
+        if (! $embedding->getConnection()->getSchemaBuilder()->hasTable($embedding->getTable())) {
+            throw NotInstalled::missingEmbeddingsTable();
+        }
+
+        $this->similarityVerified = true;
     }
 }
