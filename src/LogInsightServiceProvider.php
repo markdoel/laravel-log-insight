@@ -19,7 +19,10 @@ use MarkusDoell\LogInsight\Ai\ClusterContextBuilder;
 use MarkusDoell\LogInsight\Ai\Severity;
 use MarkusDoell\LogInsight\Analysis\LogAnalyzer;
 use MarkusDoell\LogInsight\Commands\AnalyzeCommand;
+use MarkusDoell\LogInsight\Commands\EmbedCommand;
 use MarkusDoell\LogInsight\Commands\ReportCommand;
+use MarkusDoell\LogInsight\Commands\SimilarCommand;
+use MarkusDoell\LogInsight\Contracts\EmbeddingClient;
 use MarkusDoell\LogInsight\Contracts\Fingerprinter;
 use MarkusDoell\LogInsight\Contracts\LlmClient;
 use MarkusDoell\LogInsight\Contracts\LogParser;
@@ -29,10 +32,13 @@ use MarkusDoell\LogInsight\Dashboard\ClusterPage;
 use MarkusDoell\LogInsight\Dashboard\DashboardController;
 use MarkusDoell\LogInsight\Dashboard\LivewireSupport;
 use MarkusDoell\LogInsight\Data\LogLevel;
+use MarkusDoell\LogInsight\Embeddings\VoyageEmbeddingClient;
 use MarkusDoell\LogInsight\Events\AnalysisCompleted;
+use MarkusDoell\LogInsight\Events\ClusterDetected;
 use MarkusDoell\LogInsight\Exceptions\LogInsightException;
 use MarkusDoell\LogInsight\Fingerprinting\DefaultFingerprinter;
 use MarkusDoell\LogInsight\Fingerprinting\FrameMode;
+use MarkusDoell\LogInsight\Listeners\QueueClusterEmbedding;
 use MarkusDoell\LogInsight\Listeners\SendSevereClusterNotification;
 use MarkusDoell\LogInsight\Llm\AnthropicClient;
 use MarkusDoell\LogInsight\Notifications\ClusterNotifier;
@@ -40,6 +46,9 @@ use MarkusDoell\LogInsight\Notifications\SlackChannelSupport;
 use MarkusDoell\LogInsight\Parsing\LogFileLocator;
 use MarkusDoell\LogInsight\Parsing\MonologLogParser;
 use MarkusDoell\LogInsight\Redaction\PatternRedactor;
+use MarkusDoell\LogInsight\Similarity\EmbeddingScheduler;
+use MarkusDoell\LogInsight\Similarity\SimilarClusters;
+use MarkusDoell\LogInsight\Storage\InstallationCheck;
 use MarkusDoell\LogInsight\Support\AppPaths;
 use Psr\Log\LoggerInterface;
 
@@ -146,6 +155,8 @@ final class LogInsightServiceProvider extends ServiceProvider
             );
         });
 
+        $this->registerSimilarity();
+
         $this->app->singletonIf(LivewireSupport::class, static fn (): LivewireSupport => LivewireSupport::detect());
 
         $this->app->singleton(SlackChannelSupport::class, static fn (): SlackChannelSupport => SlackChannelSupport::detect());
@@ -179,6 +190,10 @@ final class LogInsightServiceProvider extends ServiceProvider
             $this->app->make(EventDispatcher::class)->listen(AnalysisCompleted::class, SendSevereClusterNotification::class);
         }
 
+        if ((bool) $config->get('log-insight.similarity.enabled', false)) {
+            $this->app->make(EventDispatcher::class)->listen(ClusterDetected::class, QueueClusterEmbedding::class);
+        }
+
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'log-insight');
 
         if ((bool) $config->get('log-insight.dashboard.enabled', false)) {
@@ -194,15 +209,65 @@ final class LogInsightServiceProvider extends ServiceProvider
                 __DIR__.'/../database/migrations' => database_path('migrations'),
             ], 'log-insight-migrations');
 
+            // Separate, so existing installations opt in to the new table.
+            $this->publishesMigrations([
+                __DIR__.'/../database/migrations-similarity' => database_path('migrations'),
+            ], 'log-insight-similarity-migrations');
+
             $this->publishes([
                 __DIR__.'/../resources/views' => resource_path('views/vendor/log-insight'),
             ], 'log-insight-views');
 
             $this->commands([
                 AnalyzeCommand::class,
+                EmbedCommand::class,
                 ReportCommand::class,
+                SimilarCommand::class,
             ]);
         }
+    }
+
+    private function registerSimilarity(): void
+    {
+        $this->app->singleton(EmbeddingClient::class, static function (Application $app): EmbeddingClient {
+            $config = $app->make(Repository::class);
+
+            return new VoyageEmbeddingClient(
+                http: $app->make(HttpFactory::class),
+                apiKey: self::configNullableString($config, 'log-insight.similarity.api_key'),
+                model: self::configString($config, 'log-insight.similarity.model', VoyageEmbeddingClient::DEFAULT_MODEL),
+                baseUrl: self::configString($config, 'log-insight.similarity.base_url', VoyageEmbeddingClient::DEFAULT_BASE_URL),
+                timeout: self::configInt($config, 'log-insight.similarity.timeout', 30),
+            );
+        });
+
+        $this->app->singleton(EmbeddingScheduler::class, static function (Application $app): EmbeddingScheduler {
+            $config = $app->make(Repository::class);
+
+            return new EmbeddingScheduler(
+                client: $app->make(EmbeddingClient::class),
+                bus: $app->make(BusDispatcher::class),
+                installation: $app->make(InstallationCheck::class),
+                enabled: (bool) $config->get('log-insight.similarity.enabled', false),
+                connection: self::configNullableString($config, 'log-insight.queue.connection'),
+                queue: self::configNullableString($config, 'log-insight.queue.name'),
+                requestTimeout: self::configInt($config, 'log-insight.similarity.timeout', 30),
+            );
+        });
+
+        $this->app->singleton(SimilarClusters::class, static function (Application $app): SimilarClusters {
+            $config = $app->make(Repository::class);
+            $threshold = $config->get('log-insight.similarity.threshold', 0.85);
+
+            return new SimilarClusters(
+                client: $app->make(EmbeddingClient::class),
+                installation: $app->make(InstallationCheck::class),
+                enabled: (bool) $config->get('log-insight.similarity.enabled', false),
+                // Anything else than a number fails the validation once the feature is enabled.
+                threshold: is_numeric($threshold) ? (float) $threshold : 0.0,
+                limit: self::configInt($config, 'log-insight.similarity.limit', 5),
+            );
+        });
     }
 
     private function bootDashboard(Repository $config): void
