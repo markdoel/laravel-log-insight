@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarkusDoell\LogInsight\Tests\Feature;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\ServiceProvider;
 use MarkusDoell\LogInsight\Contracts\Fingerprinter;
 use MarkusDoell\LogInsight\Data\LogEntry;
@@ -40,6 +41,26 @@ final class ServiceProviderTest extends TestCase
 
         $this->assertCount(1, $paths);
         $this->assertFileExists(array_key_first($paths).'/create_log_insight_tables.php');
+        $this->assertFileDoesNotExist(array_key_first($paths).'/create_log_insight_cluster_embeddings_table.php');
+    }
+
+    #[Test]
+    public function it_registers_the_similarity_migration_separately(): void
+    {
+        $paths = ServiceProvider::pathsToPublish(LogInsightServiceProvider::class, 'log-insight-similarity-migrations');
+
+        $this->assertCount(1, $paths);
+        $this->assertSame(['create_log_insight_cluster_embeddings_table.php'], array_values(array_diff((array) scandir((string) array_key_first($paths)), ['.', '..'])));
+        $this->assertSame(database_path('migrations'), array_values($paths)[0]);
+    }
+
+    #[Test]
+    public function it_registers_the_commands(): void
+    {
+        $commands = array_keys(Artisan::all());
+
+        $this->assertContains('log-insight:similar', $commands);
+        $this->assertContains('log-insight:embed', $commands);
     }
 
     #[Test]
