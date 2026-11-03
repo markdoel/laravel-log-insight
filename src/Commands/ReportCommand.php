@@ -11,6 +11,7 @@ use MarkusDoell\LogInsight\Exceptions\LogInsightException;
 use MarkusDoell\LogInsight\Reporting\ClusterReport;
 use MarkusDoell\LogInsight\Reporting\Report;
 use MarkusDoell\LogInsight\Reporting\ReportRow;
+use MarkusDoell\LogInsight\Similarity\SimilarClusters;
 use MarkusDoell\LogInsight\Support\Since;
 
 final class ReportCommand extends Command
@@ -23,7 +24,7 @@ final class ReportCommand extends Command
 
     protected $description = 'Show the most frequent error clusters and their AI analysis';
 
-    public function handle(ClusterReport $reports): int
+    public function handle(ClusterReport $reports, SimilarClusters $similarClusters): int
     {
         try {
             $since = $this->stringOption('since');
@@ -32,6 +33,13 @@ final class ReportCommand extends Command
                 since: $since === null ? null : Since::parse($since),
                 minSeverity: $this->severity(),
             );
+
+            // Only in JSON, and only when enabled, so the default output stays as it was.
+            if ($this->option('json') && $similarClusters->isEnabled()) {
+                $report = $report->withSimilar($similarClusters->forClusters(
+                    array_map(static fn (ReportRow $row): int => $row->cluster->id, $report->rows),
+                ));
+            }
         } catch (LogInsightException $exception) {
             $this->components->error($exception->getMessage());
 

@@ -141,10 +141,42 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Similar Clusters
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, every new cluster is embedded with Voyage AI by a queued
+    | EmbedClusterJob: its exception class, normalized message and
+    | application frame, redacted first. Clusters whose vectors have a cosine
+    | similarity of at least "threshold" (0 to 1) are shown as similar in
+    | log-insight:report --json, log-insight:similar and the dashboard.
+    |
+    | Needs the separately published migration:
+    |   php artisan vendor:publish --tag=log-insight-similarity-migrations
+    |
+    | Without an API key the feature stays off. Model API keys from MongoDB
+    | Atlas use the default base URL; keys from the Voyage AI platform use
+    | https://api.voyageai.com. Changing the model starts over: only vectors
+    | of the same model are compared.
+    |
+    */
+
+    'similarity' => [
+        'enabled' => (bool) env('LOG_INSIGHT_SIMILARITY_ENABLED', false),
+        'api_key' => env('VOYAGE_API_KEY'),
+        'model' => env('LOG_INSIGHT_EMBEDDING_MODEL', 'voyage-4'),
+        'threshold' => (float) env('LOG_INSIGHT_SIMILARITY_THRESHOLD', 0.85),
+        'limit' => (int) env('LOG_INSIGHT_SIMILARITY_LIMIT', 5),
+        'base_url' => env('LOG_INSIGHT_VOYAGE_BASE_URL', 'https://ai.mongodb.com'),
+        'timeout' => (int) env('LOG_INSIGHT_EMBEDDING_TIMEOUT', 30),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Queue
     |--------------------------------------------------------------------------
     |
-    | Connection and queue name for AnalyzeClusterJob. Null uses the defaults.
+    | Connection and queue name for AnalyzeClusterJob and EmbedClusterJob.
+    | Null uses the defaults.
     |
     */
 

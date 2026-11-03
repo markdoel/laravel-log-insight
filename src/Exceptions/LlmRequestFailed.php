@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MarkusDoell\LogInsight\Exceptions;
 
+use MarkusDoell\LogInsight\Http\RetryPolicy;
 use Throwable;
 
 class LlmRequestFailed extends LogInsightException
@@ -25,9 +26,7 @@ class LlmRequestFailed extends LogInsightException
     public static function http(int $status, string $type, string $message): static
     {
         // 408, 409, 429 and 5xx (including 529 overloaded) are worth retrying.
-        $retryable = in_array($status, [408, 409, 429], true) || $status >= 500;
-
-        return new static("LLM request failed with HTTP {$status} ({$type}): {$message}", $retryable, $status);
+        return new static("LLM request failed with HTTP {$status} ({$type}): {$message}", RetryPolicy::isRetryableStatus($status), $status);
     }
 
     public static function connection(Throwable $previous): static

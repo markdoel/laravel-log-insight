@@ -100,6 +100,48 @@
             @endif
         </section>
 
+        @if ($similarityEnabled)
+            <section class="li-card li-section">
+                <h2>Similar clusters</h2>
+                <p class="li-muted">Clusters with other fingerprints whose error, message and location are similar, at {{ rtrim(rtrim(number_format($similarThreshold * 100, 1), '0'), '.') }}% similarity or more.</p>
+
+                @if ($similarError !== null)
+                    <div class="li-notice li-notice-error" role="alert">{{ $similarError }}</div>
+                @elseif ($similar === null)
+                    <p class="li-muted">Not embedded yet. The embedding is created by a queued job and appears here once a queue worker has processed it.</p>
+                @elseif ($similar === [])
+                    <p class="li-muted">No similar clusters.</p>
+                @else
+                    <div class="li-table-wrap">
+                        <table class="li-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col" class="li-num">Similarity</th>
+                                    <th scope="col" class="li-num">Count</th>
+                                    <th scope="col">Error</th>
+                                    <th scope="col">Message</th>
+                                    <th scope="col">Location</th>
+                                    <th scope="col">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($similar as $match)
+                                    <tr wire:key="similar-{{ $match->cluster->id }}">
+                                        <td class="li-num">{{ rtrim(rtrim(number_format($match->similarity * 100, 1), '0'), '.') }}%</td>
+                                        <td class="li-num">{{ number_format($match->cluster->occurrence_count) }}</td>
+                                        <td class="li-break">{{ $match->cluster->exception_class === null ? strtoupper($match->cluster->level->value) : class_basename($match->cluster->exception_class) }}</td>
+                                        <td class="li-message" title="{{ $match->cluster->message }}"><a class="li-row-link" href="{{ route('log-insight.cluster', $match->cluster->id) }}">{{ \Illuminate\Support\Str::limit($match->cluster->message, 120) }}</a></td>
+                                        <td class="li-code li-break">{{ $match->cluster->app_frame ?? '–' }}</td>
+                                        <td><span class="li-badge li-status-{{ $match->status() }}">{{ $match->status() }}</span></td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+            </section>
+        @endif
+
         <section class="li-card li-section">
             <h2>Occurrences per day</h2>
             <p class="li-muted">

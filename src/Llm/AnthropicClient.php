@@ -6,10 +6,10 @@ namespace MarkusDoell\LogInsight\Llm;
 
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Factory;
-use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response;
 use MarkusDoell\LogInsight\Contracts\LlmClient;
 use MarkusDoell\LogInsight\Exceptions\LlmRequestFailed;
+use MarkusDoell\LogInsight\Http\RetryPolicy;
 use Throwable;
 
 /**
@@ -21,8 +21,6 @@ use Throwable;
 final readonly class AnthropicClient implements LlmClient
 {
     private const FALLBACK_BETA = 'server-side-fallback-2026-07-01';
-
-    private const MAX_RETRY_AFTER_MS = 60_000;
 
     /**
      * @param  string|null  $effort  low, medium, high, xhigh or max; null keeps the model default
@@ -58,6 +56,8 @@ final readonly class AnthropicClient implements LlmClient
             throw LlmRequestFailed::missingApiKey($this->provider());
         }
 
+        $retries = new RetryPolicy($this->retryDelays);
+
         try {
             $response = $this->http
                 ->baseUrl(rtrim($this->baseUrl, '/'))
@@ -66,9 +66,9 @@ final readonly class AnthropicClient implements LlmClient
                 ->asJson()
                 ->timeout($this->timeout)
                 ->retry(
-                    count($this->retryDelays) + 1,
-                    fn (int $attempt, mixed $exception): int => $this->retryDelay($attempt, $exception),
-                    fn (Throwable $exception): bool => $this->shouldRetry($exception),
+                    $retries->attempts(),
+                    static fn (int $attempt, mixed $exception): int => $retries->delay($attempt, $exception),
+                    static fn (Throwable $exception): bool => $retries->shouldRetry($exception),
                     throw: false,
                 )
                 ->post('/v1/messages', $this->body($request));
@@ -181,37 +181,6 @@ final readonly class AnthropicClient implements LlmClient
         }
 
         return $text;
-    }
-
-    private function shouldRetry(Throwable $exception): bool
-    {
-        if ($exception instanceof ConnectionException) {
-            return true;
-        }
-
-        if ($exception instanceof RequestException) {
-            $status = $exception->response->status();
-
-            return in_array($status, [408, 409, 429], true) || $status >= 500;
-        }
-
-        return false;
-    }
-
-    /**
-     * Honours the retry-after header of rate limit responses.
-     */
-    private function retryDelay(int $attempt, mixed $exception): int
-    {
-        if ($exception instanceof RequestException) {
-            $retryAfter = $exception->response->header('retry-after');
-
-            if (is_numeric($retryAfter)) {
-                return min((int) ((float) $retryAfter * 1000), self::MAX_RETRY_AFTER_MS);
-            }
-        }
-
-        return $this->retryDelays[$attempt - 1] ?? 0;
     }
 
     private function errorField(Response $response, string $field): ?string

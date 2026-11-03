@@ -24,7 +24,8 @@ Instead of scrolling through thousands of log lines, you get a short list: *this
 - **Events:** `ClusterDetected` and `AnalysisCompleted`, so you can attach your own notifications or ticket creation.
 - **Reports:** a terminal table, or JSON for scripts and CI.
 - **Dashboard (opt-in):** a Livewire page in your app with the cluster list, filters for time range, minimum severity and analysis status, and pagination, plus a detail page per cluster with the analysis, stack trace, a 14-day chart and the latest occurrences. Protected by a gate that only allows the local environment by default. See [Dashboard](#dashboard).
-- **Extensible:** `LogParser`, `Fingerprinter`, `Redactor` and `LlmClient` are interfaces bound in the container.
+- **Similar clusters (opt-in):** embeds every new cluster with [Voyage AI](https://www.voyageai.com/) and finds clusters with *different* fingerprints that describe a similar problem, for example the same bug thrown from two controllers. Shown in `log-insight:report --json`, in `log-insight:similar {cluster}` and on the dashboard's cluster page. See [Similar clusters](#similar-clusters).
+- **Extensible:** `LogParser`, `Fingerprinter`, `Redactor`, `LlmClient` and `EmbeddingClient` are interfaces bound in the container.
 
 ## Requirements
 
@@ -32,6 +33,7 @@ Instead of scrolling through thousands of log lines, you get a short list: *this
 - Laravel 12 or 13 (Laravel 13 needs PHP 8.3+)
 - A queue worker for the AI analysis (any driver; `sync` works too)
 - An [Anthropic API key](https://console.anthropic.com/) if you want AI analysis. Parsing and clustering work without one.
+- Optionally a Voyage AI API key for [similar clusters](#similar-clusters).
 
 ## Installation
 
@@ -81,7 +83,20 @@ php artisan log-insight:report --limit=50 --json > report.json
 | `--limit=10` | Number of clusters to show |
 | `--since=` | Only clusters that occurred since then |
 | `--severity=` | Only analyzed clusters with at least this severity: `low`, `medium`, `high`, `critical` |
-| `--json` | Print the complete report, including suggested fixes, as JSON |
+| `--json` | Print the complete report, including suggested fixes, as JSON. With [similar clusters](#similar-clusters) enabled, every cluster also gets a `similar` list. |
+
+Find clusters similar to cluster 3 (needs [similar clusters](#similar-clusters)):
+
+```bash
+php artisan log-insight:similar 3
+php artisan log-insight:similar 3 --threshold=0.8 --limit=10 --json
+```
+
+| Option | Description |
+|---|---|
+| `--limit=` | Number of similar clusters to show (default `LOG_INSIGHT_SIMILARITY_LIMIT`, 5) |
+| `--threshold=` | Minimum cosine similarity from 0 to 1 (default `LOG_INSIGHT_SIMILARITY_THRESHOLD`, 0.85) |
+| `--json` | Print the result as JSON |
 
 ### Running it on a schedule
 
@@ -195,6 +210,13 @@ All options live in `config/log-insight.php` and can be set via `.env`:
 | `LOG_INSIGHT_DASHBOARD_ENABLED` | `false` | Register the dashboard routes (cluster list and cluster detail page). Needs `livewire/livewire`. See [Dashboard](#dashboard). |
 | `LOG_INSIGHT_DASHBOARD_PATH` | `log-insight` | URL path of the dashboard. Cluster pages live at `{path}/clusters/{id}`. |
 | `dashboard.middleware` (config only) | `['web']` | Middleware for the dashboard routes. The `viewLogInsight` gate is always added. |
+| `LOG_INSIGHT_SIMILARITY_ENABLED` | `false` | Embed new clusters and show similar clusters. Needs `VOYAGE_API_KEY` and the separate migration. See [Similar clusters](#similar-clusters). |
+| `VOYAGE_API_KEY` | – | Voyage AI API key. Without it, similar clusters stay off. |
+| `LOG_INSIGHT_EMBEDDING_MODEL` | `voyage-4` | Embedding model. `voyage-4-large` is more accurate, `voyage-4-lite` cheaper. Only vectors of the same model are compared. |
+| `LOG_INSIGHT_SIMILARITY_THRESHOLD` | `0.85` | Minimum cosine similarity (greater than 0, at most 1) for a cluster to count as similar. |
+| `LOG_INSIGHT_SIMILARITY_LIMIT` | `5` | Similar clusters shown per cluster. |
+| `LOG_INSIGHT_VOYAGE_BASE_URL` | `https://ai.mongodb.com` | Embeddings API base URL. Use `https://api.voyageai.com` for keys from the Voyage AI platform. |
+| `LOG_INSIGHT_EMBEDDING_TIMEOUT` | `30` | HTTP timeout in seconds for embedding requests. |
 
 The application directories that count for the "topmost application frame" are set in `fingerprint.app_paths` (default `app/`, `src/`, `routes/`, `database/`). Vendor code never counts.
 
@@ -307,6 +329,59 @@ php artisan vendor:publish --tag=log-insight-views
 
 They are copied to `resources/views/vendor/log-insight`. The styles live in `partials/styles.blade.php`.
 
+### Similar clusters
+
+Fingerprints are exact on purpose: a different exception class, message or application frame starts a new cluster. That keeps clusters clean, but the same underlying bug can show up as several clusters, for example a missing relation that throws in `OrderController` and in `InvoiceController`, or a message that changed wording in a deploy. Similar clusters find those groups with text embeddings from [Voyage AI](https://www.voyageai.com/). They are off by default.
+
+1. Publish and run the separate migration. It adds one table, `log_insight_cluster_embeddings`, and leaves the existing tables alone:
+
+   ```bash
+   php artisan vendor:publish --tag=log-insight-similarity-migrations
+   php artisan migrate
+   ```
+
+2. Enable the feature and add your key:
+
+   ```dotenv
+   LOG_INSIGHT_SIMILARITY_ENABLED=true
+   VOYAGE_API_KEY=...
+   ```
+
+   Voyage AI model API keys are created in MongoDB Atlas under **AI Model APIs** and work with the default base URL. If you have a key from the Voyage AI platform instead, also set `LOG_INSIGHT_VOYAGE_BASE_URL=https://api.voyageai.com`.
+
+3. Embed the clusters you already have, once:
+
+   ```bash
+   php artisan log-insight:embed
+   ```
+
+From then on, `log-insight:analyze` queues one `EmbedClusterJob` per new cluster, on the same queue connection and queue as `AnalyzeClusterJob`. Each job sends one short text and stores one vector per cluster and model. Clusters that are embedded already are never sent again.
+
+**What is embedded:** the exception class (or the level, for plain log messages), the normalized message and the application frame, for example:
+
+```text
+Illuminate\Database\Eloquent\ModelNotFoundException
+No query results for model [App\Models\Order] {n}
+at app/Http/Controllers/OrderController.php:24
+```
+
+The text passes the same redaction layer as everything else. No stack trace, no source code and no raw message is sent.
+
+**How similarity is computed:** the cosine similarity of two vectors, from 0 (unrelated) to 1 (the same). A cluster counts as similar when it reaches `LOG_INSIGHT_SIMILARITY_THRESHOLD` (0.85 by default). The comparison runs in PHP over the stored vectors, so no vector database is needed.
+
+**Where you see it:**
+
+- `log-insight:similar {cluster}` lists the most similar clusters with their similarity, count, error, message, location and analysis status.
+- `log-insight:report --json` adds `similar` to every cluster: a list of `id`, `similarity`, `exception_class`, `level`, `message`, `location`, `occurrences`, `last_seen_at` and `status`, or `null` while the cluster has no embedding yet. The table output and the JSON without the feature stay exactly as before.
+- The dashboard's cluster page shows a **Similar clusters** section that links to each similar cluster.
+
+Trade-offs:
+
+- **Tune the threshold.** Similarity depends on your messages. Short, generic messages score high with each other. Start with the default, look at `log-insight:similar` for a few clusters you know, and adjust.
+- **Changing the model starts over.** Vectors of different models cannot be compared, so after changing `LOG_INSIGHT_EMBEDDING_MODEL` run `log-insight:embed` again. The old vectors stay in the table until you delete them.
+- **Scale.** Every lookup reads all vectors of the configured model, in chunks of 500. That is fast for thousands of clusters. A JSON report computes the similar clusters of all its rows in one pass.
+- **Cost.** One small request per new cluster, a few dozen tokens each.
+
 ### Custom redaction patterns
 
 ```php
@@ -355,8 +430,9 @@ flowchart LR
     DB --> Report["log-insight:report<br/>dashboard<br/>(ClusterReport)"]
 ```
 
-- **Commands only call services.** `AnalyzeCommand` delegates to `LogAnalyzer`, `ReportCommand` to `ClusterReport`. The dashboard's `ClusterList` component uses `ClusterReport` too, `ClusterPage` uses `ClusterDetailReport` and `AnalysisScheduler`.
-- **Everything that leaves the server passes the `Redactor`.** That is the only way from `ClusterContextBuilder` to `LlmClient`.
+- **Commands only call services.** `AnalyzeCommand` delegates to `LogAnalyzer`, `ReportCommand` to `ClusterReport` (and `SimilarClusters` for `--json`), `SimilarCommand` to `SimilarClusters`, `EmbedCommand` to `EmbeddingScheduler`. The dashboard's `ClusterList` component uses `ClusterReport` too, `ClusterPage` uses `ClusterDetailReport` and `AnalysisScheduler`.
+- **Everything that leaves the server passes the `Redactor`.** That is the only way from `ClusterContextBuilder` to `LlmClient`, and from `ClusterEmbedder` to `EmbeddingClient`.
+- **Similar clusters** hang off the `ClusterDetected` event: the `QueueClusterEmbedding` listener is only registered when the feature is enabled, and queues an `EmbedClusterJob`. To use another embedding provider, implement `EmbeddingClient` and bind it the same way as `LlmClient`.
 - **Contracts in `src/Contracts`** can be rebound in the container. To use another AI provider, implement `LlmClient` and bind it:
 
   ```php
@@ -397,6 +473,8 @@ Log Insight sends data to a third-party AI provider. Please read this before ena
 - e-mail addresses and IPv4/IPv6 addresses
 - by default, all string arguments in stack frames
 
+**Similar clusters:** when enabled, Voyage AI receives, once per cluster and model, the exception class or level, the normalized message and the application frame, redacted. No stack trace, source code or raw message is sent. Check the [MongoDB/Voyage AI terms](https://www.mongodb.com/legal) before you send production data.
+
 **Notifications:** when enabled, mail and Slack notifications contain the normalized message, the location, the root cause and the suggested fix. They pass the same redaction layer first, and no stack trace or source code is included.
 
 **What is never sent:** vendor source code, files outside your project root (paths from the log are resolved safely, so `../` tricks don't work), and clusters that already have an analysis.
@@ -417,7 +495,7 @@ composer analyse   # PHPStan (Larastan, level max)
 composer lint      # Pint
 ```
 
-The test suite never contacts a real AI provider. Every request is faked with `Http::fake()`, and stray requests fail the test. CI runs the suite on PHP 8.2–8.5 with Laravel 12 and 13, against SQLite, MySQL and Postgres.
+The test suite never contacts a real AI or embedding provider. Every request is faked with `Http::fake()`, and stray requests fail the test. CI runs the suite on PHP 8.2–8.5 with Laravel 12 and 13, against SQLite, MySQL and Postgres.
 
 ## How this was built
 
